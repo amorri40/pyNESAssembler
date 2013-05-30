@@ -1,0 +1,4 @@
+*.exe
+*.nes
+*.dat
+/mario_bros.asm
