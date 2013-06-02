@@ -7,8 +7,6 @@ import re
 from opcodeHandelers import *
 import opcodeHandelers
 
-label_list = []
-
 ################################################## 
 # Handle expressions
 ################################################## 
@@ -46,9 +44,12 @@ def handle_string(original_string, location_of_match,tokens):
 	return (bytes(tokens[0].replace('"',''), 'UTF-8'))
 
 def handle_label(original_string, location_of_match,tokens):
-	label_list.append(tokens[0])
+	location = getCurrentFilePosition() # need to find location
+	label_list[tokens[0]] = location
 	return tokens[2:]
 
+def handle_immediate_num(original_string, location_of_match,tokens):
+	return tokens
 	
 
 ################################################## 
@@ -60,6 +61,7 @@ asm6 = Forward()
 dbToken = Keyword(".db", caseless=True)
 hexToken = Keyword(".hex", caseless=True)
 originToken = Keyword(".org", caseless=True)
+labelToken = Word(srange("[a-zA-Z0-9_]"))
 
 dotToken = '.' + Word(alphas, exact=2)
 anyOpcodeToken = Word(alphas, exact=3)
@@ -69,9 +71,11 @@ hex_num = Group('$' + Word(hexnums)).setParseAction(handle_hex_num) #hexnums + h
 binary_num = Group('%' + Word('01')).setParseAction(handle_bin_num)
 dec_num = Word(nums).setParseAction(handle_dec_num)
 
+immediate_num = ('#' + (hex_num | binary_num)).setParseAction(handle_immediate_num)
+
 labelStatement = (Word(srange("[a-zA-Z0-9_]")) + ":" + Optional(asm6)).setParseAction(handle_label)
 
-expression << (dec_num | quotedString.setParseAction(handle_string) | hex_num |binary_num | dec_num) + ZeroOrMore(','+expression)
+expression << (immediate_num | dec_num | quotedString.setParseAction(handle_string) | hex_num |binary_num | dec_num | labelToken) + ZeroOrMore(','+expression)
 
 ################################################## 
 # Statements
@@ -92,6 +96,11 @@ asm6Comment = ";" + restOfLine
 asm6 << ZeroOrMore(labelStatement | commonStatements) #+ restOfLine
 asm6.ignore( asm6Comment )
 
+def get_relative_location_as_byte(jump_loc, current_loc):
+	relative_loc = jump_loc - current_loc
+	byte_value = struct.pack('b',relative_loc)
+	return byte_value
+
 
 if __name__ == "__main__":
 	_file = open("mario_bros.asm", "r")
@@ -109,8 +118,17 @@ if __name__ == "__main__":
 		if line_number >40:
 			break
 	print (output_bytes)
+	current_location=0
 	for byte in output_bytes:
 		#print (type(byte))
+		if type(byte).__name__ == 'str':
+			print ('possible label, need to replace this with relative address')
+			label=byte
+			location_of_label = (label_list[label])
+			relative_location = get_relative_location_as_byte(location_of_label, current_location)
+			opcodeHandelers.nes_output_file.write(relative_location)
+			continue
 		opcodeHandelers.nes_output_file.write(byte)
+		current_location += len(byte)
 	opcodeHandelers.nes_output_file.close()
 	_file.close()
