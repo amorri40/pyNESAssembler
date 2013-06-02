@@ -181,6 +181,8 @@ def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value):
 				write_immediate_value(value_bytes)
 			elif hex_value:
 				print ('hex value with 1 byte, zp?')
+				writeOp(op,'NORM')
+				write_immediate_value(value_bytes)
 			elif binary_value:
 				print ("binary value"+op)
 			else:
@@ -201,32 +203,32 @@ def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value):
 
 
 reservedWordList = {
-"brk" : {'NORM' : '0x00', 'Immediate' : '0x00', 'ZeroPage' : '0x00', 'Implied': '-1', 'Type' : 'System'},
+
 "ora" : {'NORM' : '0x09', 'Immediate' : '0x01', 'INDX' : '0x11', 'INDY' : '0x15', 'ZeroPageX' : '0x1d', 'AbsoluteX' : '0x19', 'AbsoluteY' : '0x05', 'ZeroPage' : '0x0d', 'Absolute': '-1'},
 "asl" : {'NORM' : '0x0a', 'ACC' : '0x16', 'ZeroPageX' : '0x1e', 'AbsoluteX' : '0x06', 'ZeroPage' : '0x0e', 'Absolute' : '0x0a', 'Implied': '-1'},
-"php" : {'NORM' : '0x08', 'Implied': '-1'},
+
 "bpl" : {'NORM' : '0x10', 'REL': '-1', 'Type' : 'Branch'},
 "clc" : {'NORM' : '0x18', 'Implied': '-1'},
 "jsr" : {'NORM' : '0x20', 'Absolute': '-1'},
 "and" : {'NORM' : '0x29', 'Immediate' : '0x21', 'INDX' : '0x31', 'INDY' : '0x35', 'ZeroPageX' : '0x3d', 'AbsoluteX' : '0x39', 'AbsoluteY' : '0x25', 'ZeroPage' : '0x2d', 'Absolute': '-1'},
 "bit" : {'NORM' : '0x24', 'ZeroPage' : '0x2c', 'Absolute': '-1'},
 "rol" : {'NORM' : '0x2a', 'ACC' : '0x36', 'ZeroPageX' : '0x3e', 'AbsoluteX' : '0x26', 'ZeroPage' : '0x2e', 'Absolute' : '0x2a', 'Implied': '-1'},
-"plp" : {'NORM' : '0x28', 'Implied': '-1'},
+
 "bmi" : {'NORM' : '0x30', 'REL': '-1', 'Type' : 'Branch'},
-"sec" : {'NORM' : '0x38', 'Implied': '-1'},
+
 "rti" : {'NORM' : '0x40', 'Implied': '-1'},
 "eor" : {'NORM' : '0x49', 'Immediate' : '0x41', 'INDX' : '0x51', 'INDY' : '0x55', 'ZeroPageX' : '0x5d', 'AbsoluteX' : '0x59', 'AbsoluteY' : '0x45', 'ZeroPage' : '0x4d', 'Absolute': '-1'},
 "lsr" : {'NORM' : '0x4a', 'ACC' : '0x56', 'ZeroPageX' : '0x5e', 'AbsoluteX' : '0x46', 'ZeroPage' : '0x4e', 'Absolute' : '0x4a', 'Implied': '-1'},
-"pha" : {'NORM' : '0x48', 'Implied': '-1'},
+
 "jmp" : {'NORM' : '0x6c', 'IND' : '0x4c', 'Absolute': '-1'},
 "bvc" : {'NORM' : '0x50', 'REL': '-1', 'Type' : 'Branch'},
 "cli" : {'NORM' : '0x58', 'Implied': '-1'},
 "rts" : {'NORM' : '0x60', 'Implied': '-1'},
 "adc" : {'NORM' : '0x69', 'Immediate' : '0x61', 'INDX' : '0x71', 'INDY' : '0x75', 'ZeroPageX' : '0x7d', 'AbsoluteX' : '0x79', 'AbsoluteY' : '0x65', 'ZeroPage' : '0x6d', 'Absolute': '-1'},
 "ror" : {'NORM' : '0x6a', 'ACC' : '0x76', 'ZeroPageX' : '0x7e', 'AbsoluteX' : '0x66', 'ZeroPage' : '0x6e', 'Absolute' : '0x6a', 'Implied': '-1'},
-"pla" : {'NORM' : '0x68', 'Implied': '-1'},
+
 "bvs" : {'NORM' : '0x70', 'REL': '-1', 'Type' : 'Branch'},
-"sei" : {'NORM' : '0x78', 'Implied': '-1'},
+
 "sta" : {'NORM' : '0x81', 'INDX' : '0x91', 'INDY' : '0x95', 'ZeroPageX' : '0x9d', 'AbsoluteX' : '0x99', 'AbsoluteY' : '0x85', 'ZeroPage' : '0x8d', 'Absolute': '-1'},
 "sty" : {'NORM' : '0x94', 'ZeroPageX' : '0x84', 'ZeroPage' : '0x8c', 'Absolute': '-1'},
 "stx" : {'NORM' : '0x96', 'ZeroPageY' : '0x86', 'ZeroPage' : '0x8e', 'Absolute': '0x8e'},
@@ -235,9 +237,11 @@ reservedWordList = {
 "bcc" : {'NORM' : '0x90', 'REL': '-1', 'Type' : 'Branch'},
 "tya" : {'NORM' : '0x98', 'Implied': '-1'},
 "txs" : {'NORM' : '0x9a', 'Implied': '-1'},
+
 "ldy" : {'NORM' : '0xa0', 'Immediate' : '0xb4', 'ZeroPageX' : '0xbc', 'AbsoluteX' : '0xa4', 'ZeroPage' : '0xac', 'Absolute': '-1'},
 "lda" : {'NORM' : '0xa9', 'Immediate' : '0xa1', 'INDX' : '0xb1', 'INDY' : '0xb5', 'ZeroPageX' : '0xbd', 'AbsoluteX' : '0xb9', 'AbsoluteY' : '0xa5', 'ZeroPage' : '0xad', 'Absolute': '0xad'},
 "ldx" : {'NORM' : '0xa2', 'Immediate' : '0xb6', 'ZeroPageY' : '0xbe', 'AbsoluteY' : '0xa6', 'ZeroPage' : '0xae', 'Absolute': '-1'},
+
 "tay" : {'NORM' : '0xa8', 'Implied': '-1'},
 "tax" : {'NORM' : '0xaa', 'Implied': '-1'},
 "bcs" : {'NORM' : '0xb0', 'REL': '-1', 'Type' : 'Branch'},
@@ -251,10 +255,27 @@ reservedWordList = {
 "bne" : {'NORM' : '0xd0', 'REL': '-1', 'Type' : 'Branch'},
 "cld" : {'NORM' : '0xd8', 'Implied': '-1'},
 "cpx" : {'NORM' : '0xe0', 'Immediate' : '0xe4', 'ZeroPage' : '0xec', 'Absolute': '-1'},
-"sbc" : {'NORM' : '0xe9', 'Immediate' : '0xe1', 'INDX' : '0xf1', 'INDY' : '0xf5', 'ZeroPageX' : '0xfd', 'AbsoluteX' : '0xf9', 'AbsoluteY' : '0xe5', 'ZeroPage' : '0xed', 'Absolute': '-1'},
+
 "inc" : {'NORM' : '0xf6', 'ZeroPageX' : '0xfe', 'AbsoluteX' : '0xe6', 'ZeroPage' : '0xee', 'Absolute': '-1'},
 "inx" : {'NORM' : '0xe8', 'Implied': '-1'},
-"nop" : {'NORM' : '0xea', 'Implied': '-1', 'Type' : 'System'},
+
 "beq" : {'NORM' : '0xf0', 'REL': '-1', 'Type' : 'Branch'},
-"sed" : {'NORM' : '0xf8', 'Implied': '-1'}
+
+# Math
+"sbc" : {'Immediate' :'0xe9',  'INDX' :'0xe1', 'INDY' : '0xf1',  'ZeroPageX' : '0xf5', 'AbsoluteX' : '0xfd', 'AbsoluteY' : '0xf9', 'ZeroPage' : '0xe5', 'Absolute': '0xed'},
+
+#Registers
+"sed" : {'Implied': '0xf8',  'Type' : 'Register'},
+"sei" : { 'Implied': '0x78',  'Type' : 'Register'},
+"sec" : { 'Implied': '0x38',  'Type' : 'Register'},
+
+#Stack
+"pla" : {'Implied': '0x68', 'Type' : 'Stack'},
+"pha" : {'Implied': '0x48',  'Type' : 'Stack'},
+"plp" : {'Implied': '0x28',  'Type' : 'Stack'},
+"php" : {'Implied': '0x08',  'Type' : 'Stack'},
+
+#System
+"brk" : {'Immediate' : '0x00', 'ZeroPage' : '0x00',  'Implied': '0x00', 'Type' : 'System'},
+"nop" : {'Implied':'0xea', 'Type' : 'System'},
 }
