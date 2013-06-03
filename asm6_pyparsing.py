@@ -49,8 +49,8 @@ def handle_label(original_string, location_of_match,tokens):
 	#this is called after the bytes for this instruction have been written
 	location = getCurrentFilePosition() #opcodeHandelers.global_position_in_file + 1
 	label_list[tokens[0]] = location 
-	log ('location of '+str(tokens[0])+' is '+ str(location))
-	log(output_bytes)
+	#log ('location of '+str(tokens[0])+' is '+ str(location))
+	#log(output_bytes)
 	return tokens[2:]
 
 def handle_immediate_num(original_string, location_of_match,tokens):
@@ -117,20 +117,27 @@ def get_relative_location_as_byte(jump_loc, current_loc):
 
 	#if (relative_loc<0): relative_loc-=1 #we need to ignore the byte already written for this instruction
 	relative_loc-=1
-	log('relative_loc:'+str(relative_loc)+' jump_loc:'+str(jump_loc)+' current_loc:'+str(current_loc))
-	byte_value = struct.pack('b',relative_loc)
+	if relative_loc>127 or relative_loc<-128:
+		log('relative_loc:'+str(relative_loc))
+		byte_value = struct.pack('h',relative_loc)
+	else:
+		byte_value = struct.pack('b',relative_loc)
 	return byte_value
 
 def write_absolute_jump_label(label):
 	log('absolute jump')
 	label = label[1:]
-	location_of_label = (label_list[label])
-	byte_value = struct.pack('b',location_of_label)
+	try:
+		location_of_label = (label_list[label])
+		location_of_label += opcodeHandelers.global_addr
+		byte_value = struct.pack('<H',location_of_label)
+		opcodeHandelers.nes_output_file.write(byte_value) #todo fix this to work for 2 bytes
+		#opcodeHandelers.nes_output_file.write(byte_value)
 
-	opcodeHandelers.nes_output_file.write(location_of_label)
-
-	if len(byte_value<2):
-		opcodeHandelers.nes_output_file.write(location_of_label) #TODO fix this
+	except KeyError:
+		byte_value = struct.pack('b',0)
+		opcodeHandelers.nes_output_file.write(byte_value)
+		opcodeHandelers.nes_output_file.write(byte_value)
 
 if __name__ == "__main__":
 	_file = open("mario_bros.asm", "r")
@@ -146,12 +153,15 @@ if __name__ == "__main__":
 				print ('didnt parse:'+line, end="")
 
 		line_number += 1
-		if line_number >65:
+		if line_number >65000:
 			break
-	print (output_bytes)
+	#
+	# Now done parsing lets fix labels and write to file
+	#
+	setLineNumber(-1) #indicate we are done to the log function
 	current_location=0
 	for byte in output_bytes:
-		#print (type(byte))
+		
 		if type(byte).__name__ == 'str':
 			label=byte
 			if label.find('2') == 0:

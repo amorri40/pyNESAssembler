@@ -15,7 +15,7 @@ def setLineNumber(lineno):
 	global_line_number = lineno
 
 def log(message):
-	if global_line_number>4:
+	if global_line_number>9000:
 		print ('Line:'+str(global_line_number)+', Byte: '+str(getCurrentFilePosition())+' ', end="")
 		print(message)
 
@@ -44,14 +44,19 @@ def handle_common_statement(original_string, location_of_match,tokens):
 	global_previous_position_in_file = global_position_in_file
 	#if len(tokens) <1: return
 	try:
-		op = tokens[0].replace('.','',1).lower()
+		op = None
+		if tokens[0] == '.': 
+			op = tokens[1].lower()
+		else:
+			op = tokens[0].replace('.','',1).lower()
 		if op in directivesList:
 			directivesList[op](original_string, location_of_match, tokens)
 		else: 
 			if op in reservedWordList:
 				handle_reserved_word(op,original_string, location_of_match, tokens)
 			else:
-				log(op+"not in list")
+				log("This op:"+op+" is not in list")
+				log (tokens)
 	except Exception as e:
 	    log (e)
 	
@@ -65,9 +70,12 @@ def handle_db(original_string, location_of_match,tokens):
 
 def handle_org(original_string, location_of_match,tokens):
 	global global_addr
-	log ("set the base address to:")
-	log (tokens)
-	global_addr = tokens[1]
+	print ("set the base address to:")
+	print (tokens)
+	
+	hex_val = tokens[2]+tokens[3]
+	global_addr = struct.unpack('>H',hex_val)[0]-10
+	print (global_addr)
 
 def handle_hex(original_string, location_of_match,tokens):
 	#print ("write these hex values:")
@@ -77,6 +85,8 @@ def handle_hex(original_string, location_of_match,tokens):
 		byte_value = struct.pack('B',int(hex_value,16))
 		writeToFile(byte_value)
 
+def handle_dw(original_string, location_of_match,tokens):
+	log('dw call')
 
 directivesList = {
         #"":nothing,
@@ -95,7 +105,7 @@ directivesList = {
         #"INCBIN": handle_incbin,"BIN": handle_incbin,
         "hex": handle_hex,
         #"WORD": handle_dw,
-        #"DW": handle_dw,
+        "dw": handle_dw,
         #"DCW": handle_dw,
         #"DC.W": handle_dw,
         #"BYTE": handle_db,
@@ -142,7 +152,9 @@ def write_label(op, label):
 		log('jump instruction')
 		global_position_in_file +=2 #jump instructions use absolute addresses (2 bytes)
 		label = '2'+label
+		writeOp(op,'Absolute')
 	else:
+		writeOp(op,'REL')
 		global_position_in_file +=1 #we need to increment position in file as the correct location byte will go here
 	output_bytes.append(label) #we fix labels at a later stage just write it to outputbytes as string
 
@@ -229,7 +241,6 @@ def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value, 
 			writeOp(op,'Absolute')
 			write_absolute_value(value_bytes)
 		else:
-			writeOp(op,'REL')
 			#must be a label
 			write_label(op, value_bytes[0])
 		log("op:"+op)
