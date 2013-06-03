@@ -32,7 +32,7 @@ def handle_hex_num(original_string, location_of_match,tokens):
 			return_list.append(byte_value)
 		#print (hex_temp)
 		#print (bytearray.fromhex(hex_temp))
-		print (return_list)
+		#print (return_list)
 		return return_list
 	except Exception as e:
 		print (e)
@@ -43,9 +43,14 @@ def handle_dec_num(original_string, location_of_match,tokens):
 def handle_string(original_string, location_of_match,tokens):
 	return (bytes(tokens[0].replace('"',''), 'UTF-8'))
 
+# Handle label adds labels to the labellist
+# It is called when a label definitoon is found
 def handle_label(original_string, location_of_match,tokens):
-	location = getCurrentFilePosition() # need to find location
-	label_list[tokens[0]] = location
+	#this is called after the bytes for this instruction have been written
+	location = getCurrentFilePosition() #opcodeHandelers.global_position_in_file + 1
+	label_list[tokens[0]] = location 
+	log ('location of '+str(tokens[0])+' is '+ str(location))
+	log(output_bytes)
 	return tokens[2:]
 
 def handle_immediate_num(original_string, location_of_match,tokens):
@@ -57,6 +62,7 @@ def handle_immediate_num(original_string, location_of_match,tokens):
 ##################################################
 expression = Forward()
 asm6 = Forward()
+commonStatements = Forward()
 
 dbToken = Keyword(".db", caseless=True)
 hexToken = Keyword(".hex", caseless=True)
@@ -75,7 +81,7 @@ dec_num = Word(nums).setParseAction(handle_dec_num)
 
 immediate_num = ('#' + (hex_num | binary_num)).setParseAction(handle_immediate_num)
 
-labelStatement = (Word(srange("[a-zA-Z0-9_]")) + ":" + Optional(asm6)).setParseAction(handle_label)
+labelStatement = (Word(srange("[a-zA-Z0-9_]")) + ":" + Optional(commonStatements)).setParseAction(handle_label)
 
 expression << Optional('(') + (immediate_num | dec_num | quotedString.setParseAction(handle_string) | hex_num |binary_num | dec_num | labelToken) + Optional(')') + ZeroOrMore(','+expression) + Optional(')')
 
@@ -87,7 +93,7 @@ dbStatement = (dbToken + expression) #+ ', ' + hex_num + restOfLine
 hexStatement = hexToken + OneOrMore(Word(hexnums, exact=2))
 originStatement = originToken + expression
 
-commonStatements = (dbStatement | hexStatement | originStatement | anyStatement).setParseAction(handle_common_statement)
+commonStatements << (dbStatement | hexStatement | originStatement | anyStatement).setParseAction(handle_common_statement)
 
 # Ignore Comments
 asm6Comment = ";" + restOfLine
@@ -99,16 +105,38 @@ asm6 << ZeroOrMore(labelStatement | commonStatements) #+ restOfLine
 asm6.ignore( asm6Comment )
 
 def get_relative_location_as_byte(jump_loc, current_loc):
+	#we want to get a relative location
+	#from the last byte of the current opcode +1 (so it doesn't include it)
+	# to the new byte -1
+	#current_loc+=2
+	#jump_loc-=1
 	relative_loc = jump_loc - current_loc
+
+	#when subtracting we want to go to the start of the instruction
+	# when adding we want to start adding from the end of the current instruction
+
+	#if (relative_loc<0): relative_loc-=1 #we need to ignore the byte already written for this instruction
+	relative_loc-=1
+	log('relative_loc:'+str(relative_loc)+' jump_loc:'+str(jump_loc)+' current_loc:'+str(current_loc))
 	byte_value = struct.pack('b',relative_loc)
 	return byte_value
 
+def write_absolute_jump_label(label):
+	log('absolute jump')
+	label = label[1:]
+	location_of_label = (label_list[label])
+	byte_value = struct.pack('b',location_of_label)
+
+	opcodeHandelers.nes_output_file.write(location_of_label)
+
+	if len(byte_value<2):
+		opcodeHandelers.nes_output_file.write(location_of_label) #TODO fix this
 
 if __name__ == "__main__":
 	_file = open("mario_bros.asm", "r")
 	opcodeHandelers.nes_output_file = open('outfile.bin','wb')
 	all_lines = _file.readlines()
-	line_number = 0
+	line_number = 1
 	for line in all_lines:
 		setLineNumber(line_number)
 		tokens = asm6.parseString( line )
@@ -118,18 +146,23 @@ if __name__ == "__main__":
 				print ('didnt parse:'+line, end="")
 
 		line_number += 1
-		if line_number >55:
+		if line_number >65:
 			break
 	print (output_bytes)
 	current_location=0
 	for byte in output_bytes:
 		#print (type(byte))
 		if type(byte).__name__ == 'str':
-			print ('possible label, need to replace this with relative address')
 			label=byte
-			location_of_label = (label_list[label])
-			relative_location = get_relative_location_as_byte(location_of_label, current_location)
-			opcodeHandelers.nes_output_file.write(relative_location)
+			if label.find('2') == 0:
+				write_absolute_jump_label(label)
+				current_location += 2 #not a relative location
+			else: #relative location
+				
+				location_of_label = (label_list[label])
+				relative_location = get_relative_location_as_byte(location_of_label, current_location)
+				opcodeHandelers.nes_output_file.write(relative_location)
+				current_location += 1 #labels rel offsets take up 1 byte
 			continue
 		opcodeHandelers.nes_output_file.write(byte)
 		current_location += len(byte)

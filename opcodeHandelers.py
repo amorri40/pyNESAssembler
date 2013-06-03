@@ -8,21 +8,22 @@ global_addr = 0
 global_position_in_file = 0
 global_previous_position_in_file = 0
 global_line_number = 0
+global_loc_at_start_of_current_opcode=0
 
 def setLineNumber(lineno):
 	global global_line_number
 	global_line_number = lineno
 
 def log(message):
-	if global_line_number>40:
-		print (str(global_line_number)+': ', end="")
+	if global_line_number>4:
+		print ('Line:'+str(global_line_number)+', Byte: '+str(getCurrentFilePosition())+' ', end="")
 		print(message)
 
 # Ths function calculates the current file position
 # The current file position is the start of this instruction
 # so it uses the previous position and subtracts 1
 def getCurrentFilePosition():
-	return global_previous_position_in_file -1 #global_position_in_file
+	return global_previous_position_in_file #global_position_in_file
 
 def writeToFile(bytes):
 	global output_bytes, global_position_in_file
@@ -134,22 +135,24 @@ def write_absolute_value(value_bytes):
 def write_immediate_value(value_bytes):
 	writeToFile(value_bytes[0])
 
-def write_label(label):
-	print ("write_label:"+label)
-	if label in label_list:
-		print (label_list[label])
-		#writeInt(label_list[label])
+def write_label(op, label):
+	global global_position_in_file
+	
+	if reservedWordList[op]["Type"] == "Jump":
+		log('jump instruction')
+		global_position_in_file +=2 #jump instructions use absolute addresses (2 bytes)
+		label = '2'+label
 	else:
-		print(label+" label not in list")
-	output_bytes.append(label)
+		global_position_in_file +=1 #we need to increment position in file as the correct location byte will go here
+	output_bytes.append(label) #we fix labels at a later stage just write it to outputbytes as string
 
 def writeOp(op, _type):
 	opcode = reservedWordList[op][_type]
 	writeHexFromString(opcode)
 
 def handle_reserved_word(op,original_string, location_of_match,tokens):
-	log('handle_reserved_word:'+op)
-	log(tokens)
+	#log('handle_reserved_word:'+op)
+	#log(tokens)
 	if len(tokens) == 1:
 		normal_op = reservedWordList[op]['Implied']
 		writeHexFromString(normal_op)
@@ -176,6 +179,8 @@ def handle_reserved_word(op,original_string, location_of_match,tokens):
 				x_index = True
 			elif (token.lower() == 'y'):
 				y_index = True
+			elif (token == ','):
+				continue
 			elif (type(token).__name__ == 'bytes'):
 					value_bytes.append(token)
 			elif (type(token).__name__ == 'str'):
@@ -191,41 +196,43 @@ def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value, 
 		# now lets use the data
 		############################
 		num_of_value_bytes = len(value_bytes)
-		log('num_of_value_bytes for '+op+": "+str(num_of_value_bytes))
-		log(value_bytes)
-		if num_of_value_bytes == 1: # 1 byte normally zero page
-			log(op+" has 1 value byte")
-			if immediate_value:
-				log(op+' has immediate value parameter')
-				writeOp(op,'Immediate')
-				write_immediate_value(value_bytes)
-			elif hex_value and num_of_value_bytes == 1:
-				log('hex value with 1 byte, zp?')
-				writeOp(op,'ZeroPage')
-				write_immediate_value(value_bytes)
-			elif binary_value:
-				log("binary value"+op)
-			elif indirect_value:
-				log('indirect value'+op)
-			elif x_index:
-				writeOp(op,'AbsoluteX')
-			elif y_index:
-				writeOp(op,'AbsoluteY')
-			else:
-				writeOp(op,'REL')
-				#must be a label
-				write_label(value_bytes[0])
-		elif num_of_value_bytes == 2:
-			if hex_value:
-				log(op+' absolute addressing mode')
-				absolute_op = reservedWordList[op]['Absolute']
-				log(absolute_op)
-				writeHexFromString(absolute_op)
-				write_absolute_value(value_bytes)
-			elif binary_value:
-				log("binary value"+op)
-			else:
-				log('not hex and 2:'+op)
+		#log('num_of_value_bytes for '+op+": "+str(num_of_value_bytes))
+		#log(value_bytes)
+		
+			
+		if immediate_value:
+			#log(op+' has immediate value parameter')
+			writeOp(op,'Immediate')
+			write_immediate_value(value_bytes)
+		elif binary_value:
+			log("binary value"+op)
+		elif indirect_value and x_index:
+			writeOp(op,'INDX')
+			write_immediate_value(value_bytes)
+		elif indirect_value and y_index:
+			writeOp(op,'INDY')
+			write_immediate_value(value_bytes)
+		elif indirect_value:
+			log('indirect value'+op)
+		elif x_index:
+			writeOp(op,'AbsoluteX')
+			write_immediate_value(value_bytes)
+		elif y_index:
+			writeOp(op,'AbsoluteY')
+			write_immediate_value(value_bytes)
+		elif hex_value and num_of_value_bytes == 1:
+			#log('hex value with 1 byte, zp?')
+			writeOp(op,'ZeroPage')
+			write_immediate_value(value_bytes)
+		elif hex_value:
+			#log(op+' absolute addressing mode')
+			writeOp(op,'Absolute')
+			write_absolute_value(value_bytes)
+		else:
+			writeOp(op,'REL')
+			#must be a label
+			write_label(op, value_bytes[0])
+		log("op:"+op)
 
 
 reservedWordList = {
