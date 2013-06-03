@@ -66,7 +66,9 @@ labelToken = Word(srange("[a-zA-Z0-9_]"))
 dotToken = '.' + Word(alphas, exact=2)
 anyOpcodeToken = Word(alphas, exact=3)
 
+################################################## 
 # Expressions
+################################################## 
 hex_num = Group('$' + Word(hexnums)).setParseAction(handle_hex_num) #hexnums + hexnums
 binary_num = Group('%' + Word('01')).setParseAction(handle_bin_num)
 dec_num = Word(nums).setParseAction(handle_dec_num)
@@ -75,7 +77,7 @@ immediate_num = ('#' + (hex_num | binary_num)).setParseAction(handle_immediate_n
 
 labelStatement = (Word(srange("[a-zA-Z0-9_]")) + ":" + Optional(asm6)).setParseAction(handle_label)
 
-expression << (immediate_num | dec_num | quotedString.setParseAction(handle_string) | hex_num |binary_num | dec_num | labelToken) + ZeroOrMore(','+expression)
+expression << Optional('(') + (immediate_num | dec_num | quotedString.setParseAction(handle_string) | hex_num |binary_num | dec_num | labelToken) + Optional(')') + ZeroOrMore(','+expression) + Optional(')')
 
 ################################################## 
 # Statements
@@ -108,6 +110,7 @@ if __name__ == "__main__":
 	all_lines = _file.readlines()
 	line_number = 0
 	for line in all_lines:
+		setLineNumber(line_number)
 		tokens = asm6.parseString( line )
 		if len(tokens)<1:
 			line = line.lstrip()
@@ -115,7 +118,7 @@ if __name__ == "__main__":
 				print ('didnt parse:'+line, end="")
 
 		line_number += 1
-		if line_number >40:
+		if line_number >55:
 			break
 	print (output_bytes)
 	current_location=0

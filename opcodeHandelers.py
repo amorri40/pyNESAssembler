@@ -7,6 +7,16 @@ label_list = {}
 global_addr = 0
 global_position_in_file = 0
 global_previous_position_in_file = 0
+global_line_number = 0
+
+def setLineNumber(lineno):
+	global global_line_number
+	global_line_number = lineno
+
+def log(message):
+	if global_line_number>40:
+		print (str(global_line_number)+': ', end="")
+		print(message)
 
 # Ths function calculates the current file position
 # The current file position is the start of this instruction
@@ -40,9 +50,9 @@ def handle_common_statement(original_string, location_of_match,tokens):
 			if op in reservedWordList:
 				handle_reserved_word(op,original_string, location_of_match, tokens)
 			else:
-				print(op+"not in list")
+				log(op+"not in list")
 	except Exception as e:
-	    print (e)
+	    log (e)
 	
 
 def handle_db(original_string, location_of_match,tokens):
@@ -54,8 +64,8 @@ def handle_db(original_string, location_of_match,tokens):
 
 def handle_org(original_string, location_of_match,tokens):
 	global global_addr
-	print ("set the base address to:")
-	print (tokens)
+	log ("set the base address to:")
+	log (tokens)
 	global_addr = tokens[1]
 
 def handle_hex(original_string, location_of_match,tokens):
@@ -113,8 +123,8 @@ def handle_sei(original_string, location_of_match,tokens):
 	writeHexFromString('78') #sei[]={0x78,IMP,-1};
 
 def handle_lda(original_string, location_of_match,tokens):
-	print ('handle_lda')#{0xa9,IMM,0xa1,INDX,0xb1,INDY,0xb5,ZPX,0xbd,ABSX,0xb9,ABSY,0xa5,ZP,0xad,ABS,-1};
-	print (tokens)
+	log('handle_lda')#{0xa9,IMM,0xa1,INDX,0xb1,INDY,0xb5,ZPX,0xbd,ABSX,0xb9,ABSY,0xa5,ZP,0xad,ABS,-1};
+	log(tokens)
 	writeHexFromString('A9')
 
 def write_absolute_value(value_bytes):
@@ -138,15 +148,18 @@ def writeOp(op, _type):
 	writeHexFromString(opcode)
 
 def handle_reserved_word(op,original_string, location_of_match,tokens):
-	print ('handle_reserved_word:'+op)
-	print (tokens)
+	log('handle_reserved_word:'+op)
+	log(tokens)
 	if len(tokens) == 1:
-		normal_op = reservedWordList[op]['NORM']
+		normal_op = reservedWordList[op]['Implied']
 		writeHexFromString(normal_op)
 	else:
 		hex_value = False
 		binary_value = False
 		immediate_value = False
+		indirect_value = False
+		x_index = False
+		y_index = False
 		value_bytes = []
 		#first lets get what the parameters to the opcode are
 		# and what type they are (hex, binary, immediate)
@@ -155,122 +168,134 @@ def handle_reserved_word(op,original_string, location_of_match,tokens):
 				hex_value = True
 			elif (token == '%'):
 				binary_value = True
+			elif (token == '(' or token == ')'):
+				indirect_value = True
 			elif (token == '#'):
 				immediate_value = True
+			elif (token.lower() == 'x'):
+				x_index = True
+			elif (token.lower() == 'y'):
+				y_index = True
 			elif (type(token).__name__ == 'bytes'):
 					value_bytes.append(token)
 			elif (type(token).__name__ == 'str'):
 					#label
 					value_bytes.append(token)
 			else:
-				print ('Unknown type of token')
-				print (token)
-		writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value)
+				log('Unknown type of token')
+				log(token)
+		writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value, indirect_value, x_index, y_index)
 
-def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value):
+def writeInstruction(op, value_bytes, immediate_value, hex_value, binary_value, indirect_value, x_index, y_index):
 		############################
 		# now lets use the data
 		############################
 		num_of_value_bytes = len(value_bytes)
-		print ('num_of_value_bytes for '+op+": "+str(num_of_value_bytes))
-		if num_of_value_bytes == 1:
-			print (op+" has 1 value byte")
+		log('num_of_value_bytes for '+op+": "+str(num_of_value_bytes))
+		log(value_bytes)
+		if num_of_value_bytes == 1: # 1 byte normally zero page
+			log(op+" has 1 value byte")
 			if immediate_value:
-				print (op+' has immediate value parameter')
-				writeOp(op,'NORM') #why is immediate value in the table wrong?
+				log(op+' has immediate value parameter')
+				writeOp(op,'Immediate')
 				write_immediate_value(value_bytes)
-			elif hex_value:
-				print ('hex value with 1 byte, zp?')
-				writeOp(op,'NORM')
+			elif hex_value and num_of_value_bytes == 1:
+				log('hex value with 1 byte, zp?')
+				writeOp(op,'ZeroPage')
 				write_immediate_value(value_bytes)
 			elif binary_value:
-				print ("binary value"+op)
+				log("binary value"+op)
+			elif indirect_value:
+				log('indirect value'+op)
+			elif x_index:
+				writeOp(op,'AbsoluteX')
+			elif y_index:
+				writeOp(op,'AbsoluteY')
 			else:
-				writeOp(op,'NORM')
+				writeOp(op,'REL')
 				#must be a label
 				write_label(value_bytes[0])
 		elif num_of_value_bytes == 2:
 			if hex_value:
-				print (op+' absolute addressing mode')
+				log(op+' absolute addressing mode')
 				absolute_op = reservedWordList[op]['Absolute']
-				print (absolute_op)
+				log(absolute_op)
 				writeHexFromString(absolute_op)
 				write_absolute_value(value_bytes)
 			elif binary_value:
-				print ("binary value"+op)
+				log("binary value"+op)
 			else:
-				print('not hex and 2:'+op)
+				log('not hex and 2:'+op)
 
 
 reservedWordList = {
 
-"ora" : {'NORM' : '0x09', 'Immediate' : '0x01', 'INDX' : '0x11', 'INDY' : '0x15', 'ZeroPageX' : '0x1d', 'AbsoluteX' : '0x19', 'AbsoluteY' : '0x05', 'ZeroPage' : '0x0d', 'Absolute': '-1'},
-"asl" : {'NORM' : '0x0a', 'ACC' : '0x16', 'ZeroPageX' : '0x1e', 'AbsoluteX' : '0x06', 'ZeroPage' : '0x0e', 'Absolute' : '0x0a', 'Implied': '-1'},
-
-"bpl" : {'NORM' : '0x10', 'REL': '-1', 'Type' : 'Branch'},
-"clc" : {'NORM' : '0x18', 'Implied': '-1'},
-"jsr" : {'NORM' : '0x20', 'Absolute': '-1'},
-"and" : {'NORM' : '0x29', 'Immediate' : '0x21', 'INDX' : '0x31', 'INDY' : '0x35', 'ZeroPageX' : '0x3d', 'AbsoluteX' : '0x39', 'AbsoluteY' : '0x25', 'ZeroPage' : '0x2d', 'Absolute': '-1'},
-"bit" : {'NORM' : '0x24', 'ZeroPage' : '0x2c', 'Absolute': '-1'},
-"rol" : {'NORM' : '0x2a', 'ACC' : '0x36', 'ZeroPageX' : '0x3e', 'AbsoluteX' : '0x26', 'ZeroPage' : '0x2e', 'Absolute' : '0x2a', 'Implied': '-1'},
-
-"bmi" : {'NORM' : '0x30', 'REL': '-1', 'Type' : 'Branch'},
-
-"rti" : {'NORM' : '0x40', 'Implied': '-1'},
-"eor" : {'NORM' : '0x49', 'Immediate' : '0x41', 'INDX' : '0x51', 'INDY' : '0x55', 'ZeroPageX' : '0x5d', 'AbsoluteX' : '0x59', 'AbsoluteY' : '0x45', 'ZeroPage' : '0x4d', 'Absolute': '-1'},
-"lsr" : {'NORM' : '0x4a', 'ACC' : '0x56', 'ZeroPageX' : '0x5e', 'AbsoluteX' : '0x46', 'ZeroPage' : '0x4e', 'Absolute' : '0x4a', 'Implied': '-1'},
-
-"jmp" : {'NORM' : '0x6c', 'IND' : '0x4c', 'Absolute': '-1'},
-"bvc" : {'NORM' : '0x50', 'REL': '-1', 'Type' : 'Branch'},
-"cli" : {'NORM' : '0x58', 'Implied': '-1'},
-"rts" : {'NORM' : '0x60', 'Implied': '-1'},
-"adc" : {'NORM' : '0x69', 'Immediate' : '0x61', 'INDX' : '0x71', 'INDY' : '0x75', 'ZeroPageX' : '0x7d', 'AbsoluteX' : '0x79', 'AbsoluteY' : '0x65', 'ZeroPage' : '0x6d', 'Absolute': '-1'},
-"ror" : {'NORM' : '0x6a', 'ACC' : '0x76', 'ZeroPageX' : '0x7e', 'AbsoluteX' : '0x66', 'ZeroPage' : '0x6e', 'Absolute' : '0x6a', 'Implied': '-1'},
-
-"bvs" : {'NORM' : '0x70', 'REL': '-1', 'Type' : 'Branch'},
-
-"sta" : {'NORM' : '0x81', 'INDX' : '0x91', 'INDY' : '0x95', 'ZeroPageX' : '0x9d', 'AbsoluteX' : '0x99', 'AbsoluteY' : '0x85', 'ZeroPage' : '0x8d', 'Absolute': '-1'},
-"sty" : {'NORM' : '0x94', 'ZeroPageX' : '0x84', 'ZeroPage' : '0x8c', 'Absolute': '-1'},
-"stx" : {'NORM' : '0x96', 'ZeroPageY' : '0x86', 'ZeroPage' : '0x8e', 'Absolute': '0x8e'},
-"dey" : {'NORM' : '0x88', 'Implied': '-1'},
-"txa" : {'NORM' : '0x8a', 'Implied': '-1'},
-"bcc" : {'NORM' : '0x90', 'REL': '-1', 'Type' : 'Branch'},
-"tya" : {'NORM' : '0x98', 'Implied': '-1'},
-"txs" : {'NORM' : '0x9a', 'Implied': '-1'},
-
-"ldy" : {'NORM' : '0xa0', 'Immediate' : '0xb4', 'ZeroPageX' : '0xbc', 'AbsoluteX' : '0xa4', 'ZeroPage' : '0xac', 'Absolute': '-1'},
-"lda" : {'NORM' : '0xa9', 'Immediate' : '0xa1', 'INDX' : '0xb1', 'INDY' : '0xb5', 'ZeroPageX' : '0xbd', 'AbsoluteX' : '0xb9', 'AbsoluteY' : '0xa5', 'ZeroPage' : '0xad', 'Absolute': '0xad'},
-"ldx" : {'NORM' : '0xa2', 'Immediate' : '0xb6', 'ZeroPageY' : '0xbe', 'AbsoluteY' : '0xa6', 'ZeroPage' : '0xae', 'Absolute': '-1'},
-
-"tay" : {'NORM' : '0xa8', 'Implied': '-1'},
-"tax" : {'NORM' : '0xaa', 'Implied': '-1'},
-"bcs" : {'NORM' : '0xb0', 'REL': '-1', 'Type' : 'Branch'},
-"clv" : {'NORM' : '0xb8', 'Implied': '-1'},
-"tsx" : {'NORM' : '0xba', 'Implied': '-1'},
-"cpy" : {'NORM' : '0xc0', 'Immediate' : '0xc4', 'ZeroPage' : '0xcc', 'Absolute': '-1'},
-"cmp" : {'NORM' : '0xc9', 'Immediate' : '0xc1', 'INDX' : '0xd1', 'INDY' : '0xd5', 'ZeroPageX' : '0xdd', 'AbsoluteX' : '0xd9', 'AbsoluteY' : '0xc5', 'ZeroPage' : '0xcd', 'Absolute': '-1'},
-"dec" : {'NORM' : '0xd6', 'ZeroPageX' : '0xde', 'AbsoluteX' : '0xc6', 'ZeroPage' : '0xce', 'Absolute': '-1'},
-"iny" : {'NORM' : '0xc8', 'Implied': '-1'},
-"dex" : {'NORM' : '0xca', 'Implied': '-1'},
-"bne" : {'NORM' : '0xd0', 'REL': '-1', 'Type' : 'Branch'},
-"cld" : {'NORM' : '0xd8', 'Implied': '-1'},
-"cpx" : {'NORM' : '0xe0', 'Immediate' : '0xe4', 'ZeroPage' : '0xec', 'Absolute': '-1'},
-
-"inc" : {'NORM' : '0xf6', 'ZeroPageX' : '0xfe', 'AbsoluteX' : '0xe6', 'ZeroPage' : '0xee', 'Absolute': '-1'},
-"inx" : {'NORM' : '0xe8', 'Implied': '-1'},
-
-"beq" : {'NORM' : '0xf0', 'REL': '-1', 'Type' : 'Branch'},
+# Storage
+"ldy" : {'Immediate' : '0xa0', 'ZeroPageX' : '0xb4', 'AbsoluteX' : '0xbc', 'ZeroPage' : '0xa4', 'Absolute': '0xac', 'Type' : 'Storage' },
+"lda" : {'Immediate' : '0xa9', 'INDX' : '0xa1', 'INDY' : '0xb1', 'ZeroPageX' : '0xb5', 'AbsoluteX' : '0xbd', 'AbsoluteY' : '0xb9', 'ZeroPage' : '0xa5', 'Absolute': '0xad', 'Type' : 'Storage'},
+"ldx" : {'Immediate' : '0xa2', 'ZeroPageY' : '0xb6', 'AbsoluteY' : '0xbe', 'ZeroPage' : '0xa6', 'Absolute': '0xae', 'Type' : 'Storage'},
+"sta" : {'INDX' : '0x81', 'INDY' : '0x91', 'ZeroPageX' : '0x95', 'AbsoluteX' : '0x9d', 'AbsoluteY' : '0x99', 'ZeroPage' : '0x85', 'Absolute': '0x8d', 'Type' : 'Storage' },
+"sty" : {'ZeroPageX' : '0x94', 'ZeroPage' : '0x84', 'Absolute': '0x8c',  'Type' : 'Storage'},
+"stx" : {'ZeroPageY' : '0x96', 'ZeroPage' : '0x86', 'Absolute': '0x8e', 'Type' : 'Storage'},
+"txs" : {'Implied': '0x9a', 'Type' : 'Storage' },
+"txa" : {'Implied': '0x8a',  'Type' : 'Storage'},
+"tya" : {'Implied': '0x98', 'Type' : 'Storage'},
+"tay" : {'Implied': '0xa8', 'Type' : 'Storage'},
+"tax" : {'Implied': '0xaa', 'Type' : 'Storage'},
+"tsx" : {'Implied': '0xba', 'Type' : 'Storage'},
 
 # Math
-"sbc" : {'Immediate' :'0xe9',  'INDX' :'0xe1', 'INDY' : '0xf1',  'ZeroPageX' : '0xf5', 'AbsoluteX' : '0xfd', 'AbsoluteY' : '0xf9', 'ZeroPage' : '0xe5', 'Absolute': '0xed'},
+"sbc" : {'Immediate' :'0xe9',  'INDX' :'0xe1', 'INDY' : '0xf1',  'ZeroPageX' : '0xf5', 'AbsoluteX' : '0xfd', 'AbsoluteY' : '0xf9', 'ZeroPage' : '0xe5', 'Absolute': '0xed', 'Type' : 'Math' },
+"dex" : { 'Implied': '0xca', 'Type' : 'Math' },
+"inx" : {'Implied': '0xe8',  'Type' : 'Math'},
+"iny" : {'Implied': '0xc8',  'Type' : 'Math'},
+"dey" : {'Implied': '0x88',  'Type' : 'Math'},
+"dec" : {'ZeroPageX' : '0xd6', 'AbsoluteX' : '0xde', 'ZeroPage' : '0xc6', 'Absolute': '0xce',  'Type' : 'Math'},
+"inc" : {'ZeroPageX' : '0xf6', 'AbsoluteX' : '0xfe', 'ZeroPage' : '0xe6', 'Absolute': '0xee', 'Type' : 'Math'},
+"adc" : {'Immediate' : '0x69', 'INDX' : '0x61', 'INDY' : '0x71', 'ZeroPageX' : '0x75', 'AbsoluteX' : '0x7d', 'AbsoluteY' : '0x79', 'ZeroPage' : '0x65', 'Absolute': '0x6d',  'Type' : 'Math'},
+
+
+# Bitwise
+"and" : {'Immediate' : '0x29', 'INDX' : '0x21', 'INDY' : '0x31', 'ZeroPageX' : '0x35', 'AbsoluteX' : '0x3d', 'AbsoluteY' : '0x39', 'ZeroPage' : '0x25',  'Absolute': '0x2d', 'Type' : 'Bitwise' },
+"bit" : {'ZeroPage' : '0x24', 'Absolute': '0x2c',  'Type' : 'Bitwise'},
+"ora" : {'Immediate' : '0x09', 'INDX' : '0x01', 'INDY' : '0x11', 'ZeroPageX' : '0x15', 'AbsoluteX' : '0x1d', 'AbsoluteY' : '0x19', 'ZeroPage' : '0x05', 'Absolute': '0x0d',  'Type' : 'Bitwise' },
+"asl" : {'ACC' : '0x0a', 'ZeroPageX' : '0x16', 'AbsoluteX' : '0x1e', 'ZeroPage' : '0x06', 'Absolute' : '0x0e', 'Implied': '0x0a',  'Type' : 'Bitwise' },
+"rol" : {'ACC' : '0x2a', 'ZeroPageX' : '0x36', 'AbsoluteX' : '0x3e', 'ZeroPage' : '0x26', 'Absolute' : '0x2e', 'Implied': '0x2a',  'Type' : 'Bitwise'},
+"ror" : {'ACC' : '0x6a', 'ZeroPageX' : '0x76', 'AbsoluteX' : '0x7e', 'ZeroPage' : '0x66', 'Absolute' : '0x6e', 'Implied':  '0x6a',  'Type' : 'Bitwise'},
+"eor" : {'Immediate' : '0x49', 'INDX' : '0x41', 'INDY' : '0x51', 'ZeroPageX' : '0x55', 'AbsoluteX' : '0x5d', 'AbsoluteY' : '0x59', 'ZeroPage' : '0x45', 'Absolute': '0x4d',  'Type' : 'Bitwise'},
+"lsr" : {'ACC' : '0x4a', 'ZeroPageX' : '0x56', 'AbsoluteX' : '0x5e', 'ZeroPage' : '0x46', 'Absolute' : '0x4e', 'Implied': '0x4a',  'Type' : 'Bitwise'},
+
+
+# Branch
+"beq" : {'REL': '0xf0',  'Type' : 'Branch'},
+"bne" : {'REL': '0xd0',  'Type' : 'Branch'},
+"bcs" : {'REL': '0xb0',  'Type' : 'Branch'},
+"bcc" : {'REL': '0x90',  'Type' : 'Branch'},
+"bvs" : {'REL': '0x70',  'Type' : 'Branch'},
+"bvc" : {'REL': '0x50',  'Type' : 'Branch'},
+"bmi" : {'REL': '0x30',  'Type' : 'Branch'},
+"bpl" : {'REL': '0x10',  'Type' : 'Branch'},
+
+#Jump
+"jmp" : {'IND' : '0x6c', 'Absolute': '0x4c', 'Type' : 'Jump'},
+"jsr" : {'Absolute': '0x20', 'Type' : 'Jump'},
+"rti" : {'Implied': '0x40',  'Type' : 'Jump'},
+"rts" : {'Implied': '0x60',  'Type' : 'Jump'},
 
 #Registers
+"cpx" : {'Immediate' : '0xe0', 'ZeroPage' : '0xe4', 'Absolute': '0xec',  'Type' : 'Register'},
+"cpy" : {'Immediate' : '0xc0', 'ZeroPage' : '0xc4', 'Absolute': '0xcc', 'Type' : 'Register'},
+"cmp" : {'Immediate' : '0xc9', 'INDX' : '0xc1', 'INDY' : '0xd1', 'ZeroPageX' : '0xd5', 'AbsoluteX' : '0xdd', 'AbsoluteY' : '0xd9', 'ZeroPage' : '0xc5', 'Absolute': '0xcd', 'Type' : 'Register'},
+"cli" : {'Implied': '0x58',  'Type' : 'Register'},
+"clc" : {'Implied': '0x18',  'Type' : 'Register'},
+"clv" : {'Implied': '0xb8',  'Type' : 'Register'},
+"cld" : {'Implied': '0xd8',  'Type' : 'Register'},
 "sed" : {'Implied': '0xf8',  'Type' : 'Register'},
-"sei" : { 'Implied': '0x78',  'Type' : 'Register'},
-"sec" : { 'Implied': '0x38',  'Type' : 'Register'},
+"sei" : {'Implied': '0x78',  'Type' : 'Register'},
+"sec" : {'Implied': '0x38',  'Type' : 'Register'},
 
 #Stack
-"pla" : {'Implied': '0x68', 'Type' : 'Stack'},
+"pla" : {'Implied': '0x68',  'Type' : 'Stack'},
 "pha" : {'Implied': '0x48',  'Type' : 'Stack'},
 "plp" : {'Implied': '0x28',  'Type' : 'Stack'},
 "php" : {'Implied': '0x08',  'Type' : 'Stack'},
