@@ -104,7 +104,7 @@ asm6Comment = ";" + restOfLine
 asm6 << ZeroOrMore(labelStatement | commonStatements) #+ restOfLine
 asm6.ignore( asm6Comment )
 
-def get_relative_location_as_byte(jump_loc, current_loc):
+def get_relative_location_as_byte(label, jump_loc, current_loc):
 	#we want to get a relative location
 	#from the last byte of the current opcode +1 (so it doesn't include it)
 	# to the new byte -1
@@ -118,7 +118,7 @@ def get_relative_location_as_byte(jump_loc, current_loc):
 	#if (relative_loc<0): relative_loc-=1 #we need to ignore the byte already written for this instruction
 	relative_loc-=1
 	if relative_loc>127 or relative_loc<-128:
-		log('relative_loc:'+str(relative_loc))
+		print(label+': relative_loc:'+str(relative_loc)+' because:'+str(jump_loc)+' - '+str(current_loc))
 		byte_value = struct.pack('h',relative_loc)
 	else:
 		byte_value = struct.pack('b',relative_loc)
@@ -168,9 +168,12 @@ if __name__ == "__main__":
 				write_absolute_jump_label(label)
 				current_location += 2 #not a relative location
 			else: #relative location
-				
-				location_of_label = (label_list[label])
-				relative_location = get_relative_location_as_byte(location_of_label, current_location)
+				try:
+					location_of_label = (label_list[label])
+				except KeyError:
+					location_of_label = current_location
+					log ("haven't found the label yet: "+label)
+				relative_location = get_relative_location_as_byte(label,location_of_label, current_location)
 				opcodeHandelers.nes_output_file.write(relative_location)
 				current_location += 1 #labels rel offsets take up 1 byte
 			continue

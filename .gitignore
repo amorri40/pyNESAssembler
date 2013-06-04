@@ -2,3 +2,4 @@
 *.nes
 *.dat
 /mario_bros.asm
+*.bin
