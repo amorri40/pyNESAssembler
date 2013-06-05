@@ -6,7 +6,7 @@ class NesCPU():
     accumulator = 0
     x_register = 0
     y_register = 0
-    program_counter = 0#0x8000
+    program_counter = 0x8000
     stack = 0xFF
     
     renderer = None
@@ -38,9 +38,19 @@ class NesCPU():
     
 
     def readProgramByte(self):
-        byte = Memory.program_sections[0][self.program_counter]
+        print ('pc='+str(self.program_counter))
+        instruction_location = self.program_counter
         self.program_counter += 1
-        return byte
+        byte_value = self.memory.read_byte_from_memory(instruction_location)
+        
+        return byte_value
+
+    def readProgramShort(self):
+        instruction_location = self.program_counter
+        self.program_counter += 2
+        short_value = self.memory.read_short_from_memory(instruction_location)
+        
+        return short_value
 
     def createOpCodeTable(self):
         for opcode in reservedWordList:
@@ -71,20 +81,20 @@ class NesCPU():
         if mem_type == 'Implied':
             return -1 #implied doesn't need an address
         elif mem_type == 'Absolute':
-            byte1 = self.readProgramByte()
-            byte2 = self.readProgramByte()
-            return byte1
+            mem_loc = self.readProgramShort()
+            return mem_loc
         elif mem_type == 'AbsoluteX':
-            byte1 = self.readProgramByte()
-            byte2 = self.readProgramByte()
-            return byte1
+            mem_loc = self.readProgramShort()
+            return mem_loc+x_register
         elif mem_type == 'AbsoluteY':
-            byte1 = self.readProgramByte()
-            byte2 = self.readProgramByte()
-            return byte1
+            mem_loc = self.readProgramShort()
+            return mem_loc+y_register
         elif mem_type == 'REL':
             byte1 = self.readProgramByte()
-            return byte1
+            byte = (struct.pack('B',byte1))
+            byte = struct.unpack('b',byte)[0]
+            full_addr = self.program_counter + byte
+            return full_addr
         elif mem_type == 'Immediate':
             byte1 = self.readProgramByte()
             return byte1
