@@ -1,9 +1,16 @@
 import struct 
+from nes_memory import Memory
+from nes_cpu import *
+
+from nes_cpu_instructions import Instructions
+
 class RomFile():
 	rom = None
 	fields = {}
-	program_sections = []
-	chr_sections = []
+	
+	
+	instructions = None
+
 	def openRom(self, filename='mario_bros_original.nes'):
 		self.rom = open(filename,'rb')
 
@@ -13,6 +20,8 @@ class RomFile():
 	def printRomPosition(self):
 		print (self.rom.tell())
 
+	def byteToString(byte, frmt='B'):
+		return struct.unpack(frmt, byte)
 	def readBytes(self, number_of_bytes):
 		return self.rom.read(number_of_bytes)
 
@@ -45,14 +54,15 @@ class RomFile():
 		number_of_chr_sections = self.fields['chr_count']
 		for i in range(number_of_chr_sections):
 			bytes = self.readBytesList(8192)
-			self.chr_sections.append(bytes)
+			Memory.chr_sections.append(bytes)
 
 
-	def readPRGSections(self):
+	def readPRGSections(self, nes_cpu):
 		number_of_prg_sections = self.fields['prg_count']
 		for i in range(number_of_prg_sections):
-			bytes = self.readBytesList(16384)
-			self.program_sections.append(bytes)
+			bytes = self.readBytes(16384)
+			nes_cpu.memory.program_sections.append(bytes)
+			nes_cpu.memory.write_program_to_memory(i)
 
 	def readTrainer(self):
 		bytes = self.readBytesList(512)
@@ -71,17 +81,17 @@ class RomFile():
 		self.setIntFieldFromByte('flags9')
 		self.setIntFieldFromByte('flags10')
 		header = self.rom.read(5) # 5 zero bytes
-		
-		self.printRomPosition()
-		self.readPRGSections()
-		self.readCHRSections()
-		
-		title = self.rom.read(128)
-		print (self.fields)
-		print (title)
 
 if __name__ == "__main__":
 	rom = RomFile()
 	rom.openRom()
 	rom.readRomHeader()
+	
+	nes_cpu = NesCPU(rom)
+
+	rom.printRomPosition()
+	rom.readPRGSections(nes_cpu)
+	rom.readCHRSections()
+	nes_cpu.run_main_cpu_loop()
+	
 	rom.closeRom()
