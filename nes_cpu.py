@@ -102,7 +102,7 @@ class NesCPU():
             return full_addr
         elif mem_type == 'Immediate':
             byte1 = self.readProgramByte()
-            return byte1
+            return '#'+str(byte1)
         elif mem_type == 'ZeroPage':
             byte1 = self.readProgramByte()
             return byte1

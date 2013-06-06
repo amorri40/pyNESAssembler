@@ -1,4 +1,5 @@
 import struct
+from nes_byte_utils import *
 
 class Memory:
     program_sections = []
@@ -16,6 +17,10 @@ class Memory:
         byte_end_location = memory_location+len(bytes)
         self.main_memory[memory_location : byte_end_location] = bytes
 
+    def write_int_to_memory(self, memory_location, value):
+        self.main_memory[memory_location] = value
+        
+
     def read_bytes_from_memory(self, memory_location, number_to_read):
         if (memory_location >= 0x2000): 
             self.getIOValue(memory_location)
@@ -26,6 +31,7 @@ class Memory:
         return struct.unpack('H', bytes)[0]
 
     def read_byte_from_memory(self, memory_location):
+        if (type(memory_location).__name__ == 'str'): return struct.pack('b', int(memory_location[1:], 16))
         if (memory_location > 0x4017):
             self.getByteFromROM(memory_location)
         elif (memory_location >= 0x2000): 

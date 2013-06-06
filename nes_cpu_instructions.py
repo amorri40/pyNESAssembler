@@ -1,5 +1,6 @@
 import nes_memory
 import struct
+from nes_byte_utils import *
 
 class Instructions:
 
@@ -17,9 +18,35 @@ class Instructions:
 		self.cpu.interrupt_flag = 1
 
 	def execute_lda(self, addr):
-		self.cpu.accumulator = self.cpu.memory.read_byte_from_memory(addr)
-		self.setZeroFlagForValue(self.cpu.accumulator)
-		self.setNegativeFlagForValue(self.cpu.accumulator)
+		value = self.cpu.accumulator = self.cpu.memory.read_byte_from_memory(addr)
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	def execute_ldx(self, addr):
+		value = self.cpu.x_register = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	def execute_ldy(self, addr):
+		value = self.cpu.y_register = self.cpu.memory.read_byte_from_memory(addr)
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	def execute_sta(self, addr):
+		self.cpu.memory.write_int_to_memory(addr, self.cpu.accumulator)
+
+	def execute_stx(self, addr):
+		self.cpu.memory.write_int_to_memory(addr, self.cpu.x_register)
+
+	def execute_sty(self, addr):
+		self.cpu.memory.write_int_to_memory(addr, self.cpu.y_register)
+
+	def execute_dex(self, addr):
+		self.cpu.x_register -= 1
+		value = self.cpu.x_register
+		print (value)
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
 
 	# BPL: Branch on PLus (negative clear)
 	def execute_bpl(self, addr):
@@ -51,7 +78,7 @@ class Instructions:
 	# it moves the bits 7 positions to the right leaving just the last bit
 	# the last bit is returned as it controls whether the value is + or -
 	def valueIsNegative(self, value):
-		value = struct.unpack('b',value)[0]
+		value = byte_to_signed_int(value)
 		if value < 0: return 1
 		else: return 0
 
@@ -59,5 +86,11 @@ class Instructions:
 	'cld' : execute_cld,
 	'sei' : execute_sei,
 	'lda' : execute_lda,
+	'ldx' : execute_ldx,
+	'ldy' : execute_ldy,
+	'sta' : execute_sta,
+	'stx' : execute_stx,
+	'sty' : execute_sty,
+	'dex' : execute_dex,
 	'bpl' : execute_bpl
 	}
