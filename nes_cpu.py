@@ -1,6 +1,7 @@
 from emulate import *
 import struct
 from opcodeHandelers import *
+from nes_ppu import NesPPU
 
 class NesCPU():
     accumulator = 0
@@ -13,6 +14,7 @@ class NesCPU():
     nes_file = None
     instructions = None
     memory = None
+    ppu = None
 
     opcode_table = {}
 
@@ -33,12 +35,14 @@ class NesCPU():
         self.nes_file = nes_file
         self.instructions = Instructions(self)
         self.createOpCodeTable()
-        self.memory = Memory()
+        self.ppu = NesPPU()
+        self.memory = Memory(self.ppu)
+        
 
     
 
     def readProgramByte(self):
-        print ('pc='+str(self.program_counter))
+        #print ('pc='+str(self.program_counter))
         instruction_location = self.program_counter
         self.program_counter += 1
         byte_value = self.memory.read_byte_from_memory(instruction_location)
@@ -70,7 +74,8 @@ class NesCPU():
             
             mem_type = self.opcode_table[opcode]['mem_type']
             address = self.readInstructionParameters(opcode_name, mem_type)
-            self.instructions.execute_instruction(opcode_name, address)
+            cycles = self.instructions.execute_instruction(opcode_name, address)
+            self.ppu.execute_cycles_for_instruction(cycles)
         else:
             print ('Error opcode not in table: '+str(opcode)+' at loc:'+str(self.program_counter))
 
@@ -126,6 +131,10 @@ class NesCPU():
         self.reset = self.memory.read_short_from_memory(0xFFFC)
         print (self.reset)
 
-        for i in range(0,20):
+        for i in range(0,15000):
+            if self.ppu.end_of_current_frame:
+                self.ppu.startFrame()
+                self.ppu.end_of_current_frame = False
+
             self.readInstruction()
             
