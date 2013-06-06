@@ -2,6 +2,7 @@ from emulate import *
 import struct
 from opcodeHandelers import *
 from nes_ppu import NesPPU
+from nes_byte_utils import *
 
 class NesCPU():
     accumulator = 0
@@ -17,6 +18,7 @@ class NesCPU():
     ppu = None
 
     opcode_table = {}
+    loggingEnabled = True
 
     nmi = 0
     irq = 0
@@ -66,6 +68,14 @@ class NesCPU():
                     hex_value = int(hex_value,16)
                     self.opcode_table[hex_value] = {'opcode':opcode, 'mem_type':mem_type}
 
+    def logInstruction(self, opcode_name, mem_type, address, cycles):
+        if (self.loggingEnabled):
+            
+            print (opcode_name+'_'+mem_type+' '+str(address)+' ; cycles:'+str(cycles),end="")
+            if (self.program_counter < 0xC000):
+                print(' pc:'+str(int_to_hex(self.program_counter+0x4000)))
+            else:
+                print(' pc:'+str(int_to_hex(self.program_counter)))
 
     def readInstruction(self):
         opcode = (self.readProgramByte())
@@ -76,6 +86,7 @@ class NesCPU():
             address = self.readInstructionParameters(opcode_name, mem_type)
             cycles = self.instructions.execute_instruction(opcode_name, address)
             self.ppu.execute_cycles_for_instruction(cycles)
+            self.logInstruction(opcode_name, mem_type, address, cycles)
         else:
             print ('Error opcode not in table: '+str(opcode)+' at loc:'+str(self.program_counter))
 
@@ -102,7 +113,7 @@ class NesCPU():
             return full_addr
         elif mem_type == 'Immediate':
             byte1 = self.readProgramByte()
-            return '#'+str(byte1)
+            return self.program_counter-1 #immediate value is stored after the current opcode
         elif mem_type == 'ZeroPage':
             byte1 = self.readProgramByte()
             return byte1
@@ -116,6 +127,8 @@ class NesCPU():
             byte1 = self.readProgramByte()
             return byte1
         elif mem_type == 'INDY':
+            #Post-indexed Indirect mode.
+            #get 16 bit address from argument then add Y
             byte1 = self.readProgramByte()
             return byte1
         elif mem_type == 'INDX':
@@ -131,7 +144,7 @@ class NesCPU():
         self.reset = self.memory.read_short_from_memory(0xFFFC)
         print (self.reset)
 
-        for i in range(0,15000):
+        for i in range(0,30000):
             if self.ppu.end_of_current_frame:
                 self.ppu.startFrame()
                 self.ppu.end_of_current_frame = False

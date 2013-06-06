@@ -62,7 +62,8 @@ class RomFile():
 		for i in range(number_of_prg_sections):
 			bytes = self.readBytes(16384)
 			nes_cpu.memory.program_sections.append(bytes)
-			nes_cpu.memory.write_program_to_memory(i)
+			nes_cpu.memory.write_program_to_memory_high(i)
+			nes_cpu.memory.write_program_to_memory_low(i)
 
 	def readTrainer(self):
 		bytes = self.readBytesList(512)

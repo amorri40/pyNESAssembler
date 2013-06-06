@@ -10,14 +10,18 @@ class Memory:
     def __init__(self, ppu):
         self.ppu = ppu
 
-    def write_program_to_memory(self, program_number):
+    def write_program_to_memory_low(self, program_number):
         self.write_bytes_to_memory(0x8000, self.program_sections[program_number])
+
+    def write_program_to_memory_high(self, program_number):
+        self.write_bytes_to_memory(0xc000, self.program_sections[program_number])
 
     def write_bytes_to_memory(self, memory_location, bytes):
         byte_end_location = memory_location+len(bytes)
         self.main_memory[memory_location : byte_end_location] = bytes
 
     def write_int_to_memory(self, memory_location, value):
+        if (type(value).__name__ == 'bytes'): value = byte_to_signed_int(value)
         self.main_memory[memory_location] = value
         
 
