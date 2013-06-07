@@ -24,6 +24,8 @@ class Memory:
         if (type(value).__name__ == 'bytes'): value = byte_to_signed_int(value)
         self.main_memory[memory_location] = value
         
+    def write_short_to_memory(self, memory_location, value):
+        self.main_memory[memory_location : memory_location+2] = short_to_bytes(value)
 
     def read_bytes_from_memory(self, memory_location, number_to_read):
         if (memory_location >= 0x2000): 

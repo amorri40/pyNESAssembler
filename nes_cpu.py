@@ -9,7 +9,7 @@ class NesCPU():
     x_register = 0
     y_register = 0
     program_counter = 0x8000
-    stack = 0xFF
+    stack_pointer = 0xFF
     
     renderer = None
     nes_file = None
@@ -18,7 +18,7 @@ class NesCPU():
     ppu = None
 
     opcode_table = {}
-    loggingEnabled = True
+    loggingEnabled = False
 
     nmi = 0
     irq = 0

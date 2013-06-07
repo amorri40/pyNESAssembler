@@ -14,11 +14,14 @@ class Instructions:
 	def execute_cld(self, addr):
 		self.cpu.decimal_flag = 0
 
+	def execute_clc(self, addr):
+		self.cpu.carry_flag = 0
+
 	def execute_sei(self, addr):
 		self.cpu.interrupt_flag = 1
 
 	def execute_lda(self, addr):
-		value = self.cpu.accumulator = self.cpu.memory.read_byte_from_memory(addr)
+		value = self.cpu.accumulator = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
 
@@ -93,20 +96,74 @@ class Instructions:
 		self.cpu.program_counter = addr
 
 	def execute_jsr(self, addr):
-		self.push_to_stack(self.cpu.program_counter)
+		self.push_short_to_stack(self.cpu.program_counter)
 		self.cpu.program_counter = addr
+
+	def execute_rts(self, addr):
+		self.cpu.program_counter = self.pop_short_from_stack()
+
+	def execute_and(self, addr):
+		value = self.cpu.accumulator & byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		self.cpu.accumulator = value
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	def execute_adc(self, addr):
+		memory_value = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		value = self.cpu.accumulator + memory_value + self.cpu.carry_flag
+		
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+		self.setCarryFlagForValue(value)
+		self.setOverflowFlagForValue(self.cpu.accumulator, memory_value, value)
+		self.cpu.accumulator = value # need to set accumulator after set overflow
 
 	def execute_instruction(self, opcode_name, addr):
 		#print ('execute: '+opcode_name)
 		#try:
-		self.function_table[opcode_name](self, addr)
+		if opcode_name in self.function_table:
+			self.function_table[opcode_name](self, addr)
+		else:
+			print ('Error at pc='+get_program_counter_as_str(self.cpu.program_counter))
+			print (opcode_name + ' '+str(addr))
+			raise KeyError
 		#except Exception as e:
 		#	print (e)
 		#	print ('execute: '+opcode_name) 
 		return 2
 
-	def push_to_stack(self, val):
+	def push_short_to_stack(self, val):
+		self.cpu.stack_pointer -= 2 #stack starts at 0xFF and shrinks
+		addr = 0x0100 + self.cpu.stack_pointer
+		self.cpu.memory.write_short_to_memory(addr, val)
+		print ('pushed:'+str(val)+' to stack ( at location:'+str(addr)+' in mem)')
 		return
+
+	def pop_short_from_stack(self):
+		#get the value pointed at by the stack pointer then decrement stack pointer
+		addr = 0x0100 + self.cpu.stack_pointer
+		value = self.cpu.memory.read_short_from_memory(addr)
+		self.cpu.stack_pointer += 2
+		print ('poped: '+str(value)+' from stack')
+		return value
+
+	# Carry indicates unsigned overflow, so check if the value is > 255
+	def setCarryFlagForValue(self, value):
+		if (value > 255):
+			self.cpu.carry_flag = 1
+		else:
+			self.cpu.carry_flag = 0
+
+	# Overflow indicates signed overflow
+	def setOverflowFlagForValue(self, acc, mem, total):
+		if acc >0 and mem >0 and total < 0:
+			# positive and positive made negative so signed overflow
+			self.cpu.overflow_flag = 1
+		elif acc < 0 and mem < 0 and total > 0:
+			# negative and negative made a positive so signed overflow
+			self.cpu.overflow_flag = 1
+		else:
+			 self.cpu.overflow_flag = 0
 
 	def setNegativeFlagForValue(self, value):
 		self.cpu.negative_flag = self.valueIsNegative(value)
@@ -129,6 +186,9 @@ class Instructions:
 		else: return 0
 
 	function_table = {
+	'adc' : execute_adc,
+	'and' : execute_and,
+	'clc' : execute_clc,
 	'cld' : execute_cld,
 	'sei' : execute_sei,
 	'lda' : execute_lda,
@@ -144,6 +204,7 @@ class Instructions:
 	'txa' : execute_txa,
 	'jmp' : execute_jmp,
 	'jsr' : execute_jsr,
+	'rts' : execute_rts,
 	'bne' : execute_bne,
 	'bpl' : execute_bpl
 	}
