@@ -11,14 +11,30 @@ class Instructions:
 		self.cpu = cpu
 		self.memory = self.cpu.memory
 
+	#####################################
+	# Register opcodes
+	#####################################
+
 	def execute_cld(self, addr):
 		self.cpu.decimal_flag = 0
 
 	def execute_clc(self, addr):
 		self.cpu.carry_flag = 0
 
+	# compare the accumulator to the memory at addr
+	def execute_cmp(self, addr):
+		memory_bytes = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		difference_between_acc_and_memory = self.cpu.accumulator - memory_bytes
+		self.setZeroFlagForValue(difference_between_acc_and_memory)
+		self.setNegativeFlagForValue(difference_between_acc_and_memory)
+		self.setCarryFlagForValue( negative_byte_wrap(difference_between_acc_and_memory) )
+
 	def execute_sei(self, addr):
 		self.cpu.interrupt_flag = 1
+
+	#####################################
+	# Storage opcodes
+	#####################################
 
 	def execute_lda(self, addr):
 		value = self.cpu.accumulator = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
@@ -45,6 +61,31 @@ class Instructions:
 	def execute_sty(self, addr):
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.y_register)
 
+	def execute_txs(self, addr):
+		self.cpu.stack = self.cpu.x_register
+
+	# Transfer X to accumulator
+	def execute_txa(self, addr):
+		value = self.cpu.accumulator = self.cpu.x_register
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	# Transfer Accumulator to Y
+	def execute_tay(self, addr):
+		value = self.cpu.y_register = self.cpu.accumulator
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	# Transfer Accumulator to Y
+	def execute_tax(self, addr):
+		value = self.cpu.x_register = self.cpu.accumulator
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	#####################################
+	# Math opcodes
+	#####################################
+
 	def execute_dex(self, addr):
 		self.cpu.x_register -= 1
 		value = self.cpu.x_register
@@ -53,9 +94,7 @@ class Instructions:
 		self.setNegativeFlagForValue(value)
 
 	def execute_dey(self, addr):
-		#print ('execute_dey:'+str(self.cpu.y_register))
 		self.cpu.y_register -= 1
-		
 		value = self.cpu.y_register
 		self.cpu.y_register = negative_byte_wrap(self.cpu.y_register)
 		self.setZeroFlagForValue(value)
@@ -68,43 +107,17 @@ class Instructions:
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
 
-
-
-	def execute_txs(self, addr):
-		self.cpu.stack = self.cpu.x_register
-
-	#Transfer X to accumulator
-	def execute_txa(self, addr):
-		value = self.cpu.accumulator = self.cpu.x_register
+	def execute_inx(self, addr):
+		self.cpu.x_register += 1
+		value = self.cpu.x_register
+		self.cpu.x_register = negative_byte_wrap(self.cpu.x_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
 
-
-	# BPL: Branch on PLus (negative clear)
-	def execute_bpl(self, addr):
-		if (self.cpu.negative_flag == 0):
-			self.cpu.program_counter = addr
-
-	# Branch on not zero
-	def execute_bne(self, addr):
-		
-		if (self.cpu.zero_flag == 0):
-			self.cpu.program_counter = addr
-			#print ('bne set pc to:'+str(addr))
-	
-	def execute_jmp(self, addr):
-		self.cpu.program_counter = addr
-
-	def execute_jsr(self, addr):
-		self.push_short_to_stack(self.cpu.program_counter)
-		self.cpu.program_counter = addr
-
-	def execute_rts(self, addr):
-		self.cpu.program_counter = self.pop_short_from_stack()
-
-	def execute_and(self, addr):
-		value = self.cpu.accumulator & byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
-		self.cpu.accumulator = value
+	def execute_iny(self, addr):
+		self.cpu.y_register += 1
+		value = self.cpu.y_register
+		self.cpu.y_register = negative_byte_wrap(self.cpu.y_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
 
@@ -118,6 +131,81 @@ class Instructions:
 		self.setOverflowFlagForValue(self.cpu.accumulator, memory_value, value)
 		self.cpu.accumulator = value # need to set accumulator after set overflow
 
+	#####################################
+	# Branch opcodes
+	#####################################
+
+	# BPL: Branch on PLus (negative clear)
+	def execute_bpl(self, addr):
+		if (self.cpu.negative_flag == 0):
+			self.cpu.program_counter = addr
+
+	# Branch on not zero
+	def execute_bne(self, addr):
+		if (self.cpu.zero_flag == 0):
+			self.cpu.program_counter = addr
+
+	# Branch on equal to zero (zero flag set)
+	def execute_beq(self, addr):
+		if (self.cpu.zero_flag == 1):
+			self.cpu.program_counter = addr
+
+	#####################################
+	# Jump opcodes
+	#####################################
+	
+	def execute_jmp(self, addr):
+		self.cpu.program_counter = addr
+
+	def execute_jsr(self, addr):
+		self.push_short_to_stack(self.cpu.program_counter)
+		self.cpu.program_counter = addr
+
+	def execute_rts(self, addr):
+		self.cpu.program_counter = self.pop_short_from_stack()
+
+	#####################################
+	# Bitwise opcodes
+	#####################################
+
+	def execute_and(self, addr):
+		value = self.cpu.accumulator & byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		self.cpu.accumulator = value
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+
+	def execute_asl(self, addr):
+		if (addr == -1):
+			value = self.cpu.accumulator
+		else:
+			value = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+
+		value = negative_byte_wrap(value << 1) #shift 1 bit left
+		
+		
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+		self.setCarryFlagForValue(value)
+
+		#write value back to either accumulator or memory
+		if (addr == -1):
+			self.cpu.accumulator = value
+		else:
+			self.cpu.memory.write_int_to_memory(addr, value)
+
+
+	#####################################
+	# Stack opcodes
+	#####################################
+
+	# Pull Accumulator from Stack
+	def execute_pla(self, addr):
+		value = self.pop_byte_from_stack()
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+		self.cpu.accumulator = value
+
+
 	def execute_instruction(self, opcode_name, addr):
 		#print ('execute: '+opcode_name)
 		#try:
@@ -125,28 +213,43 @@ class Instructions:
 			self.function_table[opcode_name](self, addr)
 		else:
 			print ('Error at pc='+get_program_counter_as_str(self.cpu.program_counter))
-			print (opcode_name + ' '+str(addr))
+			print ('Missing instruction:'+opcode_name + ' '+str(addr))
 			raise KeyError
 		#except Exception as e:
 		#	print (e)
 		#	print ('execute: '+opcode_name) 
 		return 2
 
+	####################################
+	# Stack handeling helper methods
+	#####################################
+
 	def push_short_to_stack(self, val):
 		self.cpu.stack_pointer -= 2 #stack starts at 0xFF and shrinks
 		addr = 0x0100 + self.cpu.stack_pointer
 		self.cpu.memory.write_short_to_memory(addr, val)
-		print ('pushed:'+str(val)+' to stack ( at location:'+str(addr)+' in mem)')
+		#print ('pushed:'+str(val)+' to stack ( at location:'+str(addr)+' in mem)')
 		return
 
 	def pop_short_from_stack(self):
-		#get the value pointed at by the stack pointer then decrement stack pointer
+		#get the value pointed at by the stack pointer then increment stack pointer
 		addr = 0x0100 + self.cpu.stack_pointer
 		value = self.cpu.memory.read_short_from_memory(addr)
 		self.cpu.stack_pointer += 2
-		print ('poped: '+str(value)+' from stack')
+		#print ('poped: '+str(value)+' from stack')
 		return value
 
+	def pop_byte_from_stack(self):
+		#get the value pointed at by the stack pointer then increment stack pointer back up
+		addr = 0x0100 + self.cpu.stack_pointer
+		value = self.cpu.memory.read_byte_from_memory(addr)
+		self.cpu.stack_pointer += 1
+		#print ('poped: '+str(value)+' from stack')
+		return value
+
+	####################################
+	# Flag setting helper methods
+	#####################################
 	# Carry indicates unsigned overflow, so check if the value is > 255
 	def setCarryFlagForValue(self, value):
 		if (value > 255):
@@ -188,8 +291,10 @@ class Instructions:
 	function_table = {
 	'adc' : execute_adc,
 	'and' : execute_and,
+	'asl' : execute_asl,
 	'clc' : execute_clc,
 	'cld' : execute_cld,
+	'cmp' : execute_cmp,
 	'sei' : execute_sei,
 	'lda' : execute_lda,
 	'ldx' : execute_ldx,
@@ -200,11 +305,17 @@ class Instructions:
 	'dex' : execute_dex,
 	'dey' : execute_dey,
 	'dec' : execute_dec,
+	'inx' : execute_dex,
+	'iny' : execute_dey,
 	'txs' : execute_txs,
 	'txa' : execute_txa,
+	'tay' : execute_tay,
+	'tax' : execute_tax,
 	'jmp' : execute_jmp,
 	'jsr' : execute_jsr,
 	'rts' : execute_rts,
+	'pla' : execute_pla,
 	'bne' : execute_bne,
+	'beq' : execute_beq,
 	'bpl' : execute_bpl
 	}

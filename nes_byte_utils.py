@@ -33,6 +33,9 @@ def get_sign_of_byte(byte):
 def int_to_hex(value):
     return hex(value)
 
+def int_to_str(value):
+    return str(int_to_hex(value))
+
 def get_program_counter_as_str(pc):
     if (pc < 0xC000): 
         return str(int_to_hex(pc+0x4000))

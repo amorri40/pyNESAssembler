@@ -38,7 +38,7 @@ class NesCPU():
         self.instructions = Instructions(self)
         self.createOpCodeTable()
         self.ppu = NesPPU()
-        self.memory = Memory(self.ppu)
+        self.memory = Memory(self.ppu, self)
         
 
     
@@ -88,8 +88,8 @@ class NesCPU():
             self.ppu.execute_cycles_for_instruction(cycles)
             self.logInstruction(opcode_name, mem_type, address, cycles)
         else:
-            print ('Error opcode not in table: '+str(opcode)+' at loc:'+str(self.program_counter))
-
+            print ('nes_cpu.py::readInstruction: Invalid opcode, Error opcode not in table: '+str(opcode)+' at loc:'+get_program_counter_as_str(self.program_counter))
+            raise KeyError
     # 
     # reads instruction parameters and returns the address that this opcode will operate on
     # 
@@ -123,9 +123,23 @@ class NesCPU():
         elif mem_type == 'ZeroPageY':
             byte1 = self.readProgramByte()
             return byte1
-        elif mem_type == 'IND':
-            byte1 = self.readProgramByte()
-            return byte1
+        elif mem_type == 'IND': #Indirect only used by Jump
+            
+            mem_loc = self.readProgramShort()
+            print ('indirect jump to the pointer stored in memory at:'+str(mem_loc))
+            if (mem_loc < 0x1FFF):
+                print ('smaller')
+            else:
+                print ('ERROR: not implemented indirect jump larger than 1FFF')
+            try:
+                byte_1 = self.memory.read_byte_from_memory(mem_loc) #goal is 11
+                byte_2 = self.memory.read_byte_from_memory(mem_loc+1) # goal is
+                actual_jump_loc = self.memory.read_short_from_memory(mem_loc) #goal is 54283 (0xD40B)
+            except Exception as e:
+                print (e)
+            print ('so will jump to:'+str(actual_jump_loc)+' or:'+int_to_str(byte_1)+' '+int_to_str(byte_2))
+            #self.memory.print_memory()
+            return actual_jump_loc
         elif mem_type == 'INDY':
             #Post-indexed Indirect mode.
             #get 16 bit address from argument then add Y
@@ -136,6 +150,12 @@ class NesCPU():
             return byte1
         else:
             print (mem_type+' not implemented')
+
+    def get_program_counter_as_str(self):
+        if (self.program_counter < 0xC000): 
+            return str(int_to_hex(self.program_counter+0x4000))
+        else:
+            return str(int_to_hex(self.program_counter))
 
 
     def run_main_cpu_loop(self):
