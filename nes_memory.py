@@ -11,6 +11,22 @@ class Memory:
     def __init__(self, ppu, cpu):
         self.ppu = ppu
         self.cpu = cpu
+        self.reset_memory()
+
+    #reset memory to starting state
+    def reset_memory(self):
+        #initial values are 0xFF for the first 0x2000 bytes
+        for i in range(0,0x2000):
+            self.main_memory[i] = 0xFF
+        
+        for p in range(0,3):
+            i = p*0x800
+            self.main_memory[i+0x008] = 0xF7
+            self.main_memory[i+0x009] = 0xEF
+            self.main_memory[i+0x00A] = 0xDF
+            self.main_memory[i+0x00F] = 0xBF
+        
+
 
     def write_program_to_memory_low(self, program_number):
         self.write_bytes_to_memory(0x8000, self.program_sections[program_number])
@@ -54,9 +70,18 @@ class Memory:
         return bytes
 
     def handle_mem_breakpoints(self, memory_location, intent_string):
+        return
         if (memory_location == 20):
-            print ('memLocation:'+str(memory_location)+' '+intent_string, end="")
-            print (' :: memory breakpoint At pc: '+ self.cpu.get_program_counter_as_str())
+            self.print_breakpoint_info(memory_location, intent_string)
+
+        pc = int(self.cpu.get_program_counter(), 16)
+        if (pc >= 0xc01d and pc <= 0xc020 and self.cpu.y_register == 20):
+            self.print_breakpoint_info(memory_location, intent_string)
+
+    def print_breakpoint_info(self, memory_location, intent_string):
+        print ('memLocation:'+str(memory_location)+' '+intent_string, end="")
+        print (' :: memory breakpoint At pc: '+ self.cpu.get_program_counter_as_str(), end="")
+        print (' y:'+ str(self.cpu.y_register) + ' x:'+ str(self.cpu.x_register) + ' acc:'+ str(self.cpu.accumulator))
 
     def print_memory(self):
         print (self.main_memory)
