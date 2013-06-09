@@ -11,6 +11,7 @@ class NesCPU():
     y_register = 0
     program_counter = 0x8000
     stack_pointer = 0xFF
+    total_cycles = 0
     
     renderer = None
     nes_file = None
@@ -85,8 +86,9 @@ class NesCPU():
             opcode_name = self.opcode_table[opcode]['opcode']
             
             mem_type = self.opcode_table[opcode]['mem_type']
-            address = self.readInstructionParameters(opcode_name, mem_type)
-            cycles = self.instructions.execute_instruction(opcode_name, address)
+            address, cycles = self.readInstructionParameters(opcode_name, mem_type)
+            cycles += self.instructions.execute_instruction(opcode_name, address)
+            self.total_cycles += cycles
             self.ppu.execute_cycles_for_instruction(cycles)
             self.logInstruction(opcode_name, mem_type, address, cycles)
         else:
@@ -97,34 +99,34 @@ class NesCPU():
     # 
     def readInstructionParameters(self, opcode_name, mem_type):
         if mem_type == 'Implied':
-            return -1 #implied doesn't need an address
+            return (-1,0) #implied doesn't need an address
         elif mem_type == 'Absolute':
             mem_loc = self.readProgramShort()
-            return mem_loc
+            return (mem_loc,0)
         elif mem_type == 'AbsoluteX':
             mem_loc = self.readProgramShort()
-            return mem_loc+self.x_register
+            return (mem_loc+self.x_register, 1)
         elif mem_type == 'AbsoluteY':
             mem_loc = self.readProgramShort()
-            return mem_loc+self.y_register
+            return (mem_loc+self.y_register, 1)
         elif mem_type == 'REL':
             byte1 = self.readProgramByte()
             byte = (struct.pack('B',byte1))
             byte = struct.unpack('b',byte)[0]
             full_addr = self.program_counter + byte
-            return full_addr
+            return (full_addr,0)
         elif mem_type == 'Immediate':
             byte1 = self.readProgramByte()
-            return self.program_counter-1 #immediate value is stored after the current opcode
+            return (self.program_counter-1,0) #immediate value is stored after the current opcode
         elif mem_type == 'ZeroPage':
             byte1 = self.readProgramByte()
-            return byte1
+            return (byte1,0)
         elif mem_type == 'ZeroPageX':
             byte1 = self.readProgramByte()
-            return byte1
+            return (byte1 + self.x_register,1)
         elif mem_type == 'ZeroPageY':
             byte1 = self.readProgramByte()
-            return byte1
+            return (byte1 + self.y_register,1)
         elif mem_type == 'IND': #Indirect only used by Jump
             
             mem_loc = self.readProgramShort()
@@ -141,23 +143,23 @@ class NesCPU():
                 print (e)
             #print ('so will jump to:'+str(actual_jump_loc)+' or:'+int_to_str(byte_1)+' '+int_to_str(byte_2))
             #self.memory.print_memory()
-            return actual_jump_loc
+            return (actual_jump_loc,0)
         elif mem_type == 'INDY':
             #Post-indexed Indirect mode.
             #get 16 bit address from argument then add Y
             byte1 = self.readProgramByte()
-            actual_address = self.get_indirect_address(byte1)
-            return actual_address + self.y_register #byte1+self.y_register
+            actual_address = self.memory.read_short_from_memory(byte1) + self.y_register
+            return (actual_address, 1)
         elif mem_type == 'INDX':
             byte1 = self.readProgramByte()
             actual_address = self.get_indirect_address(byte1)
-            return actual_address + self.x_register #byte1+self.x_register
+            return (actual_address + self.x_register,1) #byte1+self.x_register
         else:
             print (mem_type+' not implemented')
 
     def get_indirect_address(self, mem_loc):
-        byte_1 = self.memory.read_byte_from_memory(mem_loc)
-        byte_2 = self.memory.read_byte_from_memory(mem_loc+1)
+        #byte_1 = self.memory.read_byte_from_memory(mem_loc)
+        #byte_2 = self.memory.read_byte_from_memory(mem_loc+1)
         actual_jump_loc = self.memory.read_short_from_memory(mem_loc)
         #print ('IND(Y/X)'+ str(mem_loc)+' should probably be:'+str(actual_jump_loc)+' or:'+int_to_hex(byte_1)+' '+int_to_hex(byte_2), end="")
         #print ('at pc ='+str(self.get_program_counter_as_str()))

@@ -12,10 +12,13 @@ class Instructions:
 		self.cpu = cpu
 		self.memory = self.cpu.memory
 
+	loggingi = 0
 	def logOpcode(self, message):
 		pc = self.cpu.get_program_counter()
-		if (pc > 0xc009):
-			logging.info ('pc:'+self.cpu.get_program_counter_as_str()+' x:'+str(self.cpu.x_register)+' y:'+str(self.cpu.y_register)+' acc:'+str(self.cpu.accumulator)+' zero:'+str(self.cpu.zero_flag)+' carry:'+str(self.cpu.carry_flag)+' negative:'+str(self.cpu.negative_flag)+' m:'+message)
+		if (pc <= 0xc007): return
+		if (self.loggingi > 19000 and self.loggingi < 25000 ):
+			logging.info ('pc:'+self.cpu.get_program_counter_as_str()+' x:'+str(self.cpu.x_register)+' y:'+str(self.cpu.y_register)+' acc:'+str(self.cpu.accumulator)+' zero:'+str(self.cpu.zero_flag)+' carry:'+str(self.cpu.carry_flag)+' negative:'+str(self.cpu.negative_flag)+' m:'+message) #+' cycles:'+str(self.cpu.total_cycles)
+		self.loggingi += 1
 	
 
 	#####################################
@@ -36,6 +39,14 @@ class Instructions:
 		self.setNegativeFlagForValue(difference_between_acc_and_memory)
 		self.setCarryFlagForValue( negative_byte_wrap(difference_between_acc_and_memory) )
 
+	# compare the x register to the memory at addr
+	def execute_cpx(self, addr):
+		memory_bytes = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
+		difference_between_x_and_memory = self.cpu.x_register - memory_bytes
+		self.setZeroFlagForValue(difference_between_x_and_memory)
+		self.setNegativeFlagForValue(difference_between_x_and_memory)
+		self.setCarryFlagForValue( negative_byte_wrap(difference_between_x_and_memory) )
+
 	def execute_sei(self, addr):
 		self.cpu.interrupt_flag = 1
 
@@ -44,12 +55,12 @@ class Instructions:
 	#####################################
 
 	def execute_lda(self, addr):
-		self.logOpcode('Before LDA')
+		self.logOpcode('Before LDA:'+str(addr))
 		value = self.cpu.memory.read_byte_from_memory(addr)
 		self.cpu.accumulator = byte_to_signed_int(value)
-		self.setZeroFlagForValue(self.cpu.accumulator)
+		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
-		self.logOpcode('After LDA\n')
+		self.logOpcode(str(value)+'After LDA\n')
 
 	def execute_ldx(self, addr):
 		self.logOpcode('Before LDX')
@@ -66,14 +77,20 @@ class Instructions:
 		self.logOpcode('After LDY\n')
 
 	def execute_sta(self, addr):
+		self.logOpcode('Before STA:'+str(addr))
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.accumulator)
-		#print('sta:'+str(addr))
+		self.logOpcode('After STA\n')
+		
 
 	def execute_stx(self, addr):
+		self.logOpcode('Before STX:'+str(addr))
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.x_register)
+		self.logOpcode('After STX\n')
 
 	def execute_sty(self, addr):
+		self.logOpcode('Before STY:'+str(addr))
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.y_register)
+		self.logOpcode('After STY\n')
 
 	def execute_txs(self, addr):
 		value  = self.cpu.stack_pointer = self.cpu.x_register#+0x0100
@@ -90,33 +107,46 @@ class Instructions:
 
 	# Transfer Accumulator to Y
 	def execute_tay(self, addr):
+		self.logOpcode('Before TAY')
 		value = self.cpu.y_register = self.cpu.accumulator
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After TAY\n')
 
-	# Transfer Accumulator to Y
+	# Transfer Accumulator to X
 	def execute_tax(self, addr):
+		self.logOpcode('Before TAX')
 		value = self.cpu.x_register = self.cpu.accumulator
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After TAX\n')
 
 	#####################################
 	# Math opcodes
 	#####################################
 
 	def execute_dex(self, addr):
+		self.logOpcode('Before DEX')
 		self.cpu.x_register -= 1
 		value = self.cpu.x_register
 		self.cpu.x_register = negative_byte_wrap(self.cpu.x_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After DEX\n')
 
 	def execute_dey(self, addr):
+		self.logOpcode('Before DEY')
+
+		#value = self.cpu.y_register = (self.cpu.y_register-1)&0xFF
+        #this.F_SIGN = (this.REG_Y>>7)&1;
+
 		self.cpu.y_register -= 1
-		value = self.cpu.y_register
-		self.cpu.y_register = negative_byte_wrap(self.cpu.y_register)
+		value = self.cpu.y_register &0xFF
+		self.cpu.y_register = value
+		#self.cpu.y_register = abs(value)#negative_byte_wrap(self.cpu.y_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After DEY\n')
 
 	def execute_dec(self, addr):
 		value = byte_to_unsigned_int(self.cpu.memory.read_byte_from_memory(addr))
@@ -126,18 +156,22 @@ class Instructions:
 		self.setNegativeFlagForValue(value)
 
 	def execute_inx(self, addr):
+		self.logOpcode('Before INX')
 		self.cpu.x_register += 1
 		value = self.cpu.x_register
 		self.cpu.x_register = negative_byte_wrap(self.cpu.x_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After INX\n')
 
 	def execute_iny(self, addr):
+		self.logOpcode('Before INY')
 		self.cpu.y_register += 1
 		value = self.cpu.y_register
 		self.cpu.y_register = negative_byte_wrap(self.cpu.y_register)
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After INY\n')
 
 	def execute_adc(self, addr):
 		memory_value = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
@@ -155,32 +189,51 @@ class Instructions:
 
 	# BPL: Branch on PLus (negative clear)
 	def execute_bpl(self, addr):
+		self.logOpcode('Before BPL')
 		if (self.cpu.negative_flag == 0):
 			self.cpu.program_counter = addr
+		self.logOpcode('After BPL\n')
 
 	# Branch on not zero
 	def execute_bne(self, addr):
+		self.logOpcode('Before BNE')
 		if (self.cpu.zero_flag == 0):
 			self.cpu.program_counter = addr
+		self.logOpcode('After BNE\n')
 
 	# Branch on equal to zero (zero flag set)
 	def execute_beq(self, addr):
+		self.logOpcode('Before BEQ')
 		if (self.cpu.zero_flag == 1):
 			self.cpu.program_counter = addr
+		self.logOpcode('After BEQ\n')
+
+	# Branch on carry set
+	def execute_bcs(self, addr):
+		self.logOpcode('Before BCS')
+		if (self.cpu.carry_flag == 1):
+			self.cpu.program_counter = addr
+		self.logOpcode('After BCS\n')
 
 	#####################################
 	# Jump opcodes
 	#####################################
 	
 	def execute_jmp(self, addr):
+		self.logOpcode('Before JMP')
 		self.cpu.program_counter = addr
+		self.logOpcode('After JMP\n')
 
 	def execute_jsr(self, addr):
+		self.logOpcode('Before JSR')
 		self.push_short_to_stack(self.cpu.program_counter)
 		self.cpu.program_counter = addr
+		self.logOpcode('After JSR\n')
 
 	def execute_rts(self, addr):
+		self.logOpcode('Before RTS')
 		self.cpu.program_counter = self.pop_short_from_stack()
+		self.logOpcode('After RTS\n')
 
 	#####################################
 	# Bitwise opcodes
@@ -314,6 +367,7 @@ class Instructions:
 	'clc' : execute_clc,
 	'cld' : execute_cld,
 	'cmp' : execute_cmp,
+	'cpx' : execute_cpx,
 	'sei' : execute_sei,
 	'lda' : execute_lda,
 	'ldx' : execute_ldx,
@@ -324,8 +378,8 @@ class Instructions:
 	'dex' : execute_dex,
 	'dey' : execute_dey,
 	'dec' : execute_dec,
-	'inx' : execute_dex,
-	'iny' : execute_dey,
+	'inx' : execute_inx,
+	'iny' : execute_iny,
 	'txs' : execute_txs,
 	'txa' : execute_txa,
 	'tay' : execute_tay,
@@ -336,5 +390,6 @@ class Instructions:
 	'pla' : execute_pla,
 	'bne' : execute_bne,
 	'beq' : execute_beq,
+	'bcs' : execute_bcs,
 	'bpl' : execute_bpl
 	}
