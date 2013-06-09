@@ -3,3 +3,5 @@
 *.dat
 /mario_bros.asm
 *.bin
+*log.txt
+.DS_Store

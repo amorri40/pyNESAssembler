@@ -84,6 +84,9 @@ class RomFile():
 		header = self.rom.read(5) # 5 zero bytes
 
 if __name__ == "__main__":
+
+	logging.basicConfig(filename='emulator_log.txt', filemode='w', level=logging.INFO)
+
 	rom = RomFile()
 	rom.openRom()
 	rom.readRomHeader()

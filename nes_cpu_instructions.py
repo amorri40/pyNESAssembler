@@ -1,6 +1,7 @@
 import nes_memory
 import struct
 from nes_byte_utils import *
+import logging
 
 class Instructions:
 
@@ -10,6 +11,12 @@ class Instructions:
 	def __init__(self, cpu):
 		self.cpu = cpu
 		self.memory = self.cpu.memory
+
+	def logOpcode(self, message):
+		pc = self.cpu.get_program_counter()
+		if (pc > 0xc009):
+			logging.info ('pc:'+self.cpu.get_program_counter_as_str()+' x:'+str(self.cpu.x_register)+' y:'+str(self.cpu.y_register)+' acc:'+str(self.cpu.accumulator)+' zero:'+str(self.cpu.zero_flag)+' carry:'+str(self.cpu.carry_flag)+' negative:'+str(self.cpu.negative_flag)+' m:'+message)
+	
 
 	#####################################
 	# Register opcodes
@@ -37,19 +44,26 @@ class Instructions:
 	#####################################
 
 	def execute_lda(self, addr):
-		value = self.cpu.accumulator = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
-		self.setZeroFlagForValue(value)
+		self.logOpcode('Before LDA')
+		value = self.cpu.memory.read_byte_from_memory(addr)
+		self.cpu.accumulator = byte_to_signed_int(value)
+		self.setZeroFlagForValue(self.cpu.accumulator)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After LDA\n')
 
 	def execute_ldx(self, addr):
+		self.logOpcode('Before LDX')
 		value = self.cpu.x_register = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After LDX\n')
 
 	def execute_ldy(self, addr):
+		self.logOpcode('Before LDY')
 		value = self.cpu.y_register = byte_to_signed_int(self.cpu.memory.read_byte_from_memory(addr))
 		self.setZeroFlagForValue(value)
 		self.setNegativeFlagForValue(value)
+		self.logOpcode('After LDY\n')
 
 	def execute_sta(self, addr):
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.accumulator)
@@ -62,7 +76,11 @@ class Instructions:
 		self.cpu.memory.write_int_to_memory(addr, self.cpu.y_register)
 
 	def execute_txs(self, addr):
-		self.cpu.stack = self.cpu.x_register
+		value  = self.cpu.stack_pointer = self.cpu.x_register#+0x0100
+		self.setZeroFlagForValue(value)
+		self.setNegativeFlagForValue(value)
+		print ('Transfer '+str(self.cpu.x_register)+' to stack pointer')
+
 
 	# Transfer X to accumulator
 	def execute_txa(self, addr):
@@ -228,7 +246,7 @@ class Instructions:
 		self.cpu.stack_pointer -= 2 #stack starts at 0xFF and shrinks
 		addr = 0x0100 + self.cpu.stack_pointer
 		self.cpu.memory.write_short_to_memory(addr, val)
-		#print ('pushed:'+str(val)+' to stack ( at location:'+str(addr)+' in mem)')
+		print ('pushed:'+str(val)+' to stack ( at location:'+str(addr)+' in mem)')
 		return
 
 	def pop_short_from_stack(self):
@@ -236,7 +254,7 @@ class Instructions:
 		addr = 0x0100 + self.cpu.stack_pointer
 		value = self.cpu.memory.read_short_from_memory(addr)
 		self.cpu.stack_pointer += 2
-		#print ('poped: '+str(value)+' from stack')
+		print ('poped: '+str(value)+' from stack')
 		return value
 
 	def pop_byte_from_stack(self):
@@ -244,7 +262,7 @@ class Instructions:
 		addr = 0x0100 + self.cpu.stack_pointer
 		value = self.cpu.memory.read_byte_from_memory(addr)
 		self.cpu.stack_pointer += 1
-		#print ('poped: '+str(value)+' from stack')
+		print ('poped: '+str(value)+' from stack')
 		return value
 
 	####################################
@@ -285,7 +303,8 @@ class Instructions:
 	# the last bit is returned as it controls whether the value is + or -
 	def valueIsNegative(self, value):
 		value = byte_to_signed_int(value)
-		if value < 0: return 1
+		if value < 0: return 1 #unsigned value is negative when below 0
+		elif value > 127: return 1 #signed value is actually negative when over 127
 		else: return 0
 
 	function_table = {

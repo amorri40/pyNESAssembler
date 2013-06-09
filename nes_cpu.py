@@ -3,6 +3,7 @@ import struct
 from opcodeHandelers import *
 from nes_ppu import NesPPU
 from nes_byte_utils import *
+import logging
 
 class NesCPU():
     accumulator = 0
@@ -19,6 +20,7 @@ class NesCPU():
 
     opcode_table = {}
     loggingEnabled = False
+    loggingi = 0
 
     nmi = 0
     irq = 0
@@ -32,6 +34,8 @@ class NesCPU():
     interrupt_flag = 0
     zero_flag = 0
     carry_flag = 0
+
+    cpu_logger = logging.getLogger('cpu_logger')
 
     def __init__(self, nes_file):
         self.nes_file = nes_file
@@ -70,12 +74,10 @@ class NesCPU():
 
     def logInstruction(self, opcode_name, mem_type, address, cycles):
         if (self.loggingEnabled):
+            print ('pc:'+self.get_program_counter_as_str()+' x:'+str(self.x_register)+' y:'+str(self.y_register)+' acc:'+str(self.accumulator), end=" ")
+            print (opcode_name+'_'+mem_type+' '+str(address)+' ; cycles:'+str(cycles))
+        self.loggingi += 1
             
-            print (opcode_name+'_'+mem_type+' '+str(address)+' ; cycles:'+str(cycles),end="")
-            if (self.program_counter < 0xC000):
-                print(' pc:'+str(int_to_hex(self.program_counter+0x4000)))
-            else:
-                print(' pc:'+str(int_to_hex(self.program_counter)))
 
     def readInstruction(self):
         opcode = (self.readProgramByte())
@@ -101,10 +103,10 @@ class NesCPU():
             return mem_loc
         elif mem_type == 'AbsoluteX':
             mem_loc = self.readProgramShort()
-            return mem_loc+x_register
+            return mem_loc+self.x_register
         elif mem_type == 'AbsoluteY':
             mem_loc = self.readProgramShort()
-            return mem_loc+y_register
+            return mem_loc+self.y_register
         elif mem_type == 'REL':
             byte1 = self.readProgramByte()
             byte = (struct.pack('B',byte1))
@@ -126,37 +128,49 @@ class NesCPU():
         elif mem_type == 'IND': #Indirect only used by Jump
             
             mem_loc = self.readProgramShort()
-            print ('indirect jump to the pointer stored in memory at:'+str(mem_loc))
-            if (mem_loc < 0x1FFF):
-                print ('smaller')
-            else:
-                print ('ERROR: not implemented indirect jump larger than 1FFF')
+            #print ('indirect jump to the pointer stored in memory at:'+str(mem_loc))
+            #if (mem_loc < 0x1FFF):
+            #    print ('smaller')
+            #else:
+            #    print ('ERROR: not implemented indirect jump larger than 1FFF')
             try:
                 byte_1 = self.memory.read_byte_from_memory(mem_loc) #goal is 11
                 byte_2 = self.memory.read_byte_from_memory(mem_loc+1) # goal is
                 actual_jump_loc = self.memory.read_short_from_memory(mem_loc) #goal is 54283 (0xD40B)
             except Exception as e:
                 print (e)
-            print ('so will jump to:'+str(actual_jump_loc)+' or:'+int_to_str(byte_1)+' '+int_to_str(byte_2))
+            #print ('so will jump to:'+str(actual_jump_loc)+' or:'+int_to_str(byte_1)+' '+int_to_str(byte_2))
             #self.memory.print_memory()
             return actual_jump_loc
         elif mem_type == 'INDY':
             #Post-indexed Indirect mode.
             #get 16 bit address from argument then add Y
             byte1 = self.readProgramByte()
-            return byte1
+            actual_address = self.get_indirect_address(byte1)
+            return actual_address + self.y_register #byte1+self.y_register
         elif mem_type == 'INDX':
             byte1 = self.readProgramByte()
-            return byte1
+            actual_address = self.get_indirect_address(byte1)
+            return actual_address + self.x_register #byte1+self.x_register
         else:
             print (mem_type+' not implemented')
 
-    def get_program_counter_as_str(self):
-        if (self.program_counter < 0xC000): 
-            return str(int_to_hex(self.program_counter+0x4000))
-        else:
-            return str(int_to_hex(self.program_counter))
+    def get_indirect_address(self, mem_loc):
+        byte_1 = self.memory.read_byte_from_memory(mem_loc)
+        byte_2 = self.memory.read_byte_from_memory(mem_loc+1)
+        actual_jump_loc = self.memory.read_short_from_memory(mem_loc)
+        #print ('IND(Y/X)'+ str(mem_loc)+' should probably be:'+str(actual_jump_loc)+' or:'+int_to_hex(byte_1)+' '+int_to_hex(byte_2), end="")
+        #print ('at pc ='+str(self.get_program_counter_as_str()))
+        return actual_jump_loc
 
+    def get_program_counter_as_str(self):
+        return int_to_hex(self.get_program_counter())
+
+    def get_program_counter(self):
+        if (self.program_counter < 0xC000): 
+            return ((self.program_counter+0x4000))
+        else:
+            return ((self.program_counter))
 
     def run_main_cpu_loop(self):
         self.nmi = self.memory.read_short_from_memory(0xFFFA)
